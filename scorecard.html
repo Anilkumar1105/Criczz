@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0">
+
+<title>Scorecard</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet">
+
+<style>
+
+body {
+    background: #f1f3f6;
+}
+
+.navbar {
+    background: #111827;
+}
+
+.card {
+    border: 0;
+    border-radius: 16px;
+}
+
+.score-header {
+    background: #111827;
+    color: white;
+    border-radius: 18px;
+}
+
+.score-number {
+    font-size: 42px;
+    font-weight: 800;
+}
+
+.table {
+    font-size: 14px;
+}
+
+.player-name {
+    font-weight: 600;
+}
+
+.section-title {
+    font-weight: 700;
+}
+
+</style>
+
+<link rel="stylesheet" href="style.css">
+</head>
+
+
+<body>
+
+
+<nav class="navbar navbar-dark px-3">
+
+    <span class="navbar-brand fw-bold">
+        🏏 SCORECARD
+    </span>
+
+    <a href="index.html"
+       class="btn btn-outline-light btn-sm">
+
+        Home
+
+    </a>
+
+</nav>
+
+
+<div class="container py-3">
+
+    <div id="loading"
+         class="text-center py-5">
+
+        Loading scorecard...
+
+    </div>
+
+
+    <div id="app"
+         class="d-none">
+
+
+        <!-- MATCH HEADER -->
+
+        <div class="score-header p-4 text-center mb-3">
+
+            <div id="tournament"
+                 class="small">
+            </div>
+
+            <h4 class="fw-bold">
+
+                <span id="teamA"></span>
+
+                <span class="mx-2">
+                    VS
+                </span>
+
+                <span id="teamB"></span>
+
+            </h4>
+
+            <div id="matchInfo"
+                 class="small opacity-75">
+            </div>
+
+        </div>
+
+
+        <!-- RESULT -->
+
+        <div id="result"
+             class="alert alert-success text-center d-none">
+
+            <h5 class="fw-bold mb-1">
+                🏆 Match Result
+            </h5>
+
+            <div id="winner"></div>
+
+        </div>
+
+
+        <!-- PLAYER OF THE MATCH -->
+        <div id="awardCard" class="award-card mb-3 d-none">
+            <div class="d-flex align-items-center gap-3">
+                <div class="award-icon">🏆</div>
+                <div>
+                    <div class="small text-uppercase fw-bold text-warning-emphasis">Player of the Match</div>
+                    <div id="manOfMatch" class="fs-5 fw-bold"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- INNINGS -->
+
+        <div id="inningsContainer"></div>
+
+
+    </div>
+
+</div>
+
+
+<script type="module">
+
+import { db } from "./firebase-config.js";
+
+import {
+    doc,
+    getDoc,
+    collection,
+    getDocs
+}
+from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+
+const params =
+    new URLSearchParams(location.search);
+
+
+const matchId =
+    params.get("matchId");
+
+
+if (!matchId) {
+
+    document.getElementById("loading")
+        .textContent =
+        "Match ID missing.";
+
+} else {
+
+    loadScorecard();
+
+}
+
+
+let match;
+
+let players = [];
+
+
+/* LOAD PLAYERS */
+
+async function loadPlayers() {
+
+    const snapshot =
+        await getDocs(
+            collection(db, "players")
+        );
+
+
+    players = [];
+
+
+    snapshot.forEach(item => {
+
+        players.push({
+
+            id: item.id,
+
+            ...item.data()
+
+        });
+
+    });
+
+}
+
+
+/* LOAD MATCH */
+
+async function loadScorecard() {
+
+    try {
+
+        await loadPlayers();
+
+
+        const matchSnap =
+            await getDoc(
+                doc(
+                    db,
+                    "matches",
+                    matchId
+                )
+            );
+
+
+        if (!matchSnap.exists()) {
+
+            throw new Error(
+                "Match not found."
+            );
+
+        }
+
+
+        match = {
+
+            id: matchSnap.id,
+
+            ...matchSnap.data()
+
+        };
+
+
+        const ballsSnap =
+            await getDocs(
+                collection(
+                    db,
+                    "matches",
+                    matchId,
+                    "balls"
+                )
+            );
+
+
+        const balls = [];
+
+
+        ballsSnap.forEach(item => {
+
+            balls.push({
+
+                id: item.id,
+
+                ...item.data()
+
+            });
+
+        });
+
+
+        renderHeader();
+
+        renderResult();
+
+        renderInnings(balls);
+
+
+        document.getElementById("loading")
+            .classList.add("d-none");
+
+
+        document.getElementById("app")
+            .classList.remove("d-none");
+
+
+    } catch (error) {
+
+        console.error(error);
+
+        document.getElementById("loading")
+            .textContent =
+            error.message;
+
+    }
+
+}
+
+
+/* HEADER */
+
+function renderHeader() {
+
+    document.getElementById("tournament")
+        .textContent =
+        match.tournamentName || "";
+
+
+    document.getElementById("teamA")
+        .textContent =
+        match.teamAName || "Team A";
+
+
+    document.getElementById("teamB")
+        .textContent =
+        match.teamBName || "Team B";
+
+
+    document.getElementById("matchInfo")
+        .textContent =
+        `${match.date || ""} • ${match.venue || ""}`;
+
+}
+
+
+/* RESULT */
+
+function renderResult() {
+
+    if (
+        match.status !== "COMPLETED"
+    ) {
+
+        return;
+
+    }
+
+
+    document.getElementById("result")
+        .classList.remove("d-none");
+
+
+    document.getElementById("winner")
+        .textContent =
+        match.winner || "Match Draw";
+
+    if(match.manOfMatchName){
+        document.getElementById("awardCard").classList.remove("d-none");
+        document.getElementById("manOfMatch").textContent=match.manOfMatchName;
+    }
+
+}
+
+
+/* INNINGS */
+
+function renderInnings(balls) {
+
+    const container =
+        document.getElementById(
+            "inningsContainer"
+        );
+
+
+    const innings1 =
+        balls.filter(
+            b => b.innings === 1
+        );
+
+
+    const innings2 =
+        balls.filter(
+            b => b.innings === 2
+        );
+
+
+    container.innerHTML = "";
+
+
+    const firstBattingTeam =
+        match.battingFirstId === match.teamAId
+        ? match.teamAName
+        : match.teamBName;
+
+
+    const secondBattingTeam =
+        match.battingFirstId === match.teamAId
+        ? match.teamBName
+        : match.teamAName;
+
+
+    container.innerHTML +=
+        createInningsHTML(
+            1,
+            firstBattingTeam,
+            innings1
+        );
+
+
+    if (
+        innings2.length ||
+        match.currentInnings >= 2
+    ) {
+
+        container.innerHTML +=
+            createInningsHTML(
+                2,
+                secondBattingTeam,
+                innings2
+            );
+
+    }
+
+}
+
+
+/* CREATE INNINGS */
+
+function createInningsHTML(
+    inningsNumber,
+    teamName,
+    balls
+) {
+
+    const battingTeamId =
+        inningsNumber === 1
+        ? match.battingFirstId
+        : (
+            match.battingFirstId === match.teamAId
+            ? match.teamBId
+            : match.teamAId
+        );
+
+
+    const teamScore =
+        battingTeamId === match.teamAId
+        ? match.teamAScore || 0
+        : match.teamBScore || 0;
+
+
+    const teamWickets =
+        battingTeamId === match.teamAId
+        ? match.teamAWickets || 0
+        : match.teamBWickets || 0;
+
+
+    const teamBalls =
+        battingTeamId === match.teamAId
+        ? match.teamABalls || 0
+        : match.teamBBalls || 0;
+
+
+    const batterStats =
+        calculateBatters(
+            balls
+        );
+
+
+    const bowlerStats =
+        calculateBowlers(
+            balls
+        );
+
+
+    const battingPlayers =
+        Object.values(batterStats);
+
+
+    const bowlingPlayers =
+        Object.values(bowlerStats);
+
+
+    return `
+
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-body">
+
+            <div class="d-flex
+                        justify-content-between
+                        align-items-center">
+
+                <h5 class="section-title mb-0">
+
+                    ${teamName}
+
+                </h5>
+
+                <strong>
+
+                    ${teamScore}/${teamWickets}
+
+                    <small class="text-muted">
+
+                        (${Math.floor(teamBalls / 6)}.${teamBalls % 6})
+
+                    </small>
+
+                </strong>
+
+            </div>
+
+
+            <hr>
+
+
+            <h6 class="fw-bold">
+                🏏 Batting
+            </h6>
+
+
+            <div class="table-responsive">
+
+                <table class="table table-sm">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>Batter</th>
+
+                            <th>R</th>
+
+                            <th>B</th>
+
+                            <th>4s</th>
+
+                            <th>6s</th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                        ${
+                            battingPlayers.length
+                            ?
+                            battingPlayers.map(p => `
+
+                                <tr>
+
+                                    <td class="player-name">
+
+                                        ${p.name}
+
+                                    </td>
+
+                                    <td>
+                                        ${p.runs}
+                                    </td>
+
+                                    <td>
+                                        ${p.balls}
+                                    </td>
+
+                                    <td>
+                                        ${p.fours}
+                                    </td>
+
+                                    <td>
+                                        ${p.sixes}
+                                    </td>
+
+                                </tr>
+
+                            `).join("")
+                            :
+                            `
+                            <tr>
+                                <td colspan="5"
+                                    class="text-muted text-center">
+                                    No batting data
+                                </td>
+                            </tr>
+                            `
+                        }
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+
+            <h6 class="fw-bold mt-4">
+                🎯 Bowling
+            </h6>
+
+
+            <div class="table-responsive">
+
+                <table class="table table-sm">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>Bowler</th>
+
+                            <th>O</th>
+
+                            <th>R</th>
+
+                            <th>W</th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                        ${
+                            bowlingPlayers.length
+                            ?
+                            bowlingPlayers.map(p => `
+
+                                <tr>
+
+                                    <td class="player-name">
+
+                                        ${p.name}
+
+                                    </td>
+
+                                    <td>
+
+                                        ${Math.floor(p.balls / 6)}.${p.balls % 6}
+
+                                    </td>
+
+                                    <td>
+                                        ${p.runs}
+                                    </td>
+
+                                    <td>
+                                        ${p.wickets}
+                                    </td>
+
+                                </tr>
+
+                            `).join("")
+                            :
+                            `
+                            <tr>
+                                <td colspan="4"
+                                    class="text-muted text-center">
+                                    No bowling data
+                                </td>
+                            </tr>
+                            `
+                        }
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+
+            <h6 class="fw-bold mt-4">
+                📋 Ball by Ball
+            </h6>
+
+
+            <div>
+
+                ${
+                    balls.length
+                    ?
+                    balls.map((ball, index) => {
+
+                        let text =
+                            ball.runs || 0;
+
+
+                        if (ball.extraType) {
+
+                            text =
+                                ball.extraType.toUpperCase();
+
+                        }
+
+
+                        if (ball.wicket) {
+
+                            text = "W";
+
+                        }
+
+
+                        return `
+
+                            <span class="badge
+                                         bg-light
+                                         text-dark
+                                         border
+                                         me-1
+                                         mb-1">
+
+                                ${index + 1}: ${text}
+
+                            </span>
+
+                        `;
+
+                    }).join("")
+                    :
+                    `<span class="text-muted">
+                        No balls recorded.
+                    </span>`
+                }
+
+            </div>
+
+        </div>
+
+    </div>
+
+    `;
+
+}
+
+
+/* BATTER CALCULATION */
+
+function calculateBatters(balls) {
+
+    const result = {};
+
+
+    balls.forEach(ball => {
+
+        if (!ball.batterId)
+            return;
+
+
+        if (!result[ball.batterId]) {
+
+            const player =
+                players.find(
+                    p =>
+                        p.id === ball.batterId
+                );
+
+
+            result[ball.batterId] = {
+
+                id:
+                    ball.batterId,
+
+                name:
+                    player?.name || "Unknown",
+
+                runs: 0,
+
+                balls: 0,
+
+                fours: 0,
+
+                sixes: 0
+
+            };
+
+        }
+
+
+        const p =
+            result[ball.batterId];
+
+
+        /*
+         * Only normal batting runs
+         * are credited to batter.
+         */
+
+        if (
+            !ball.extraType ||
+            ball.extraType === "noball"
+        ) {
+
+            p.runs +=
+                ball.runs || 0;
+
+        }
+
+
+        if (ball.legalBall) {
+
+            p.balls++;
+
+        }
+
+
+        if (
+            ball.runs === 4 &&
+            !ball.extraType
+        ) {
+
+            p.fours++;
+
+        }
+
+
+        if (
+            ball.runs === 6 &&
+            !ball.extraType
+        ) {
+
+            p.sixes++;
+
+        }
+
+    });
+
+
+    return result;
+
+}
+
+
+/* BOWLER CALCULATION */
+
+function calculateBowlers(balls) {
+
+    const result = {};
+
+
+    balls.forEach(ball => {
+
+        if (!ball.bowlerId)
+            return;
+
+
+        if (!result[ball.bowlerId]) {
+
+            const player =
+                players.find(
+                    p =>
+                        p.id === ball.bowlerId
+                );
+
+
+            result[ball.bowlerId] = {
+
+                id:
+                    ball.bowlerId,
+
+                name:
+                    player?.name || "Unknown",
+
+                balls: 0,
+
+                runs: 0,
+
+                wickets: 0
+
+            };
+
+        }
+
+
+        const p =
+            result[ball.bowlerId];
+
+
+        if (ball.legalBall) {
+
+            p.balls++;
+
+        }
+
+
+        /*
+         * Wides and no-balls count
+         * as bowler runs.
+         */
+
+        if (
+            ball.extraType === "wide" ||
+            ball.extraType === "noball"
+        ) {
+
+            p.runs +=
+                ball.extra || 0;
+
+        }
+
+
+        if (!ball.extraType) {
+
+            p.runs +=
+                ball.runs || 0;
+
+        }
+
+
+        if (ball.wicket) {
+
+            p.wickets++;
+
+        }
+
+    });
+
+
+    return result;
+
+}
+
+</script>
+
+</body>
+
+</html>

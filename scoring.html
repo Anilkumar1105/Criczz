@@ -1,0 +1,1872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Live Scoring</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+body {
+    background: #eef1f5;
+    font-family: Arial, sans-serif;
+}
+
+.navbar {
+    background: #111827;
+}
+
+.score-card {
+    background: #111827;
+    color: white;
+    border-radius: 18px;
+}
+
+.big-score {
+    font-size: 48px;
+    font-weight: 800;
+}
+
+.over-text {
+    font-size: 20px;
+}
+
+.scoring-btn {
+    height: 65px;
+    font-size: 22px;
+    font-weight: bold;
+    border-radius: 14px;
+}
+
+.wicket-btn {
+    height: 65px;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.ball-chip {
+    display: inline-flex;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+    background: #e9ecef;
+    margin: 3px;
+    font-weight: bold;
+}
+
+.player-row {
+    cursor: pointer;
+}
+
+.selected-player {
+    border: 3px solid #0d6efd !important;
+}
+
+.small-stat {
+    font-size: 13px;
+    color: #6c757d;
+}
+</style>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<nav class="navbar navbar-dark px-3">
+
+    <span class="navbar-brand fw-bold">
+        🏏 LIVE SCORING
+    </span>
+
+    <a href="matches.html" class="btn btn-outline-light btn-sm">
+        Matches
+    </a>
+
+</nav>
+
+
+<div class="container py-3">
+
+    <div id="loading" class="text-center py-5">
+        Loading match...
+    </div>
+
+
+    <div id="app" class="d-none">
+
+        <!-- MATCH HEADER -->
+
+        <div class="card shadow-sm mb-3">
+
+            <div class="card-body text-center">
+
+                <div class="small text-muted" id="tournamentName"></div>
+
+                <h4 class="fw-bold mb-1">
+                    <span id="teamAName"></span>
+                    <span class="text-muted"> VS </span>
+                    <span id="teamBName"></span>
+                </h4>
+
+                <div class="small text-muted" id="matchInfo"></div>
+
+            </div>
+
+        </div>
+
+
+        <!-- TOSS -->
+
+        <div id="tossSection" class="card shadow-sm mb-3">
+
+            <div class="card-body">
+
+                <h5 class="fw-bold">
+                    🪙 Toss
+                </h5>
+
+                <div class="row g-2">
+
+                    <div class="col-6">
+                        <button id="tossA"
+                                class="btn btn-outline-primary w-100">
+                            Team A
+                        </button>
+                    </div>
+
+                    <div class="col-6">
+                        <button id="tossB"
+                                class="btn btn-outline-primary w-100">
+                            Team B
+                        </button>
+                    </div>
+
+                </div>
+
+                <div class="mt-3">
+
+                    <label class="form-label">
+                        Batting First
+                    </label>
+
+                    <select id="battingFirst"
+                            class="form-select">
+
+                        <option value="">
+                            Select team
+                        </option>
+
+                    </select>
+
+                </div>
+
+                <button id="startMatch"
+                        class="btn btn-success w-100 mt-3">
+
+                    🏏 Start Match
+
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <!-- PLAYING XI -->
+
+        <div id="playingXISection"
+             class="card shadow-sm mb-3 d-none">
+
+            <div class="card-body">
+
+                <h5 class="fw-bold">
+                    👥 Playing XI
+                </h5>
+
+                <p class="small text-muted">
+                    Select 11 players for each team.
+                </p>
+
+                <div class="mb-3">
+
+                    <h6 id="xiTeamAName"></h6>
+
+                    <div id="xiTeamA"></div>
+
+                </div>
+
+                <hr>
+
+                <div>
+
+                    <h6 id="xiTeamBName"></h6>
+
+                    <div id="xiTeamB"></div>
+
+                </div>
+
+                <button id="announceXI"
+                        class="btn btn-primary w-100 mt-3">
+
+                    📢 Announce Playing XI
+
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <!-- SCORE -->
+
+        <div id="scoreSection"
+             class="d-none">
+
+            <div class="score-card shadow p-4 mb-3 text-center">
+
+                <div id="battingTeam"
+                     class="fw-bold fs-5">
+                </div>
+
+                <div class="big-score">
+
+                    <span id="score">
+                        0
+                    </span>
+
+                    /
+
+                    <span id="wickets">
+                        0
+                    </span>
+
+                </div>
+
+                <div class="over-text">
+
+                    Overs:
+                    <span id="overs">
+                        0.0
+                    </span>
+
+                </div>
+
+                <div class="mt-2"
+                     id="targetText">
+                </div>
+
+            </div>
+
+
+            <!-- CURRENT BATTERS -->
+
+            <div class="card shadow-sm mb-3">
+
+                <div class="card-body">
+
+                    <h5 class="fw-bold">
+                        🏏 Batters
+                    </h5>
+
+                    <div id="batters"></div>
+
+                </div>
+
+            </div>
+
+
+            <!-- CURRENT BOWLER -->
+
+            <div class="card shadow-sm mb-3">
+
+                <div class="card-body">
+
+                    <h5 class="fw-bold">
+                        🎯 Bowler
+                    </h5>
+
+                    <select id="bowlerSelect"
+                            class="form-select">
+
+                        <option value="">
+                            Select bowler
+                        </option>
+
+                    </select>
+
+                </div>
+
+            </div>
+
+
+            <!-- RUN BUTTONS -->
+
+            <div class="card shadow-sm mb-3">
+
+                <div class="card-body">
+
+                    <h5 class="fw-bold mb-3">
+                        Add Runs
+                    </h5>
+
+                    <div class="row g-2">
+
+                        <div class="col-4">
+                            <button class="btn btn-light border w-100 scoring-btn"
+                                    onclick="addRuns(0)">
+                                0
+                            </button>
+                        </div>
+
+                        <div class="col-4">
+                            <button class="btn btn-light border w-100 scoring-btn"
+                                    onclick="addRuns(1)">
+                                1
+                            </button>
+                        </div>
+
+                        <div class="col-4">
+                            <button class="btn btn-light border w-100 scoring-btn"
+                                    onclick="addRuns(2)">
+                                2
+                            </button>
+                        </div>
+
+                        <div class="col-4">
+                            <button class="btn btn-light border w-100 scoring-btn"
+                                    onclick="addRuns(3)">
+                                3
+                            </button>
+                        </div>
+
+                        <div class="col-4">
+                            <button class="btn btn-success w-100 scoring-btn"
+                                    onclick="addRuns(4)">
+                                4
+                            </button>
+                        </div>
+
+                        <div class="col-4">
+                            <button class="btn btn-success w-100 scoring-btn"
+                                    onclick="addRuns(6)">
+                                6
+                            </button>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- EXTRAS -->
+
+            <div class="card shadow-sm mb-3">
+
+                <div class="card-body">
+
+                    <h5 class="fw-bold">
+                        Extras
+                    </h5>
+
+                    <div class="row g-2">
+
+                        <div class="col-6">
+
+                            <button class="btn btn-warning w-100 scoring-btn"
+                                    onclick="addExtra('wide')">
+
+                                Wide
+
+                            </button>
+
+                        </div>
+
+                        <div class="col-6">
+
+                            <button class="btn btn-warning w-100 scoring-btn"
+                                    onclick="addExtra('noball')">
+
+                                No Ball
+
+                            </button>
+
+                        </div>
+
+                        <div class="col-6">
+
+                            <button class="btn btn-info w-100 scoring-btn"
+                                    onclick="addExtra('bye')">
+
+                                Bye
+
+                            </button>
+
+                        </div>
+
+                        <div class="col-6">
+
+                            <button class="btn btn-info w-100 scoring-btn"
+                                    onclick="addExtra('legbye')">
+
+                                Leg Bye
+
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- WICKET -->
+
+            <div class="card shadow-sm mb-3">
+
+                <div class="card-body">
+
+                    <button id="wicketButton"
+                            class="btn btn-danger wicket-btn w-100"
+                            onclick="addWicket()">
+
+                        🟥 WICKET
+
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <!-- BALL HISTORY -->
+
+            <div class="card shadow-sm mb-3">
+
+                <div class="card-body">
+
+                    <div class="d-flex justify-content-between">
+
+                        <h5 class="fw-bold">
+                            Ball History
+                        </h5>
+
+                        <button class="btn btn-outline-danger btn-sm"
+                                onclick="undoLastBall()">
+
+                            Undo
+
+                        </button>
+
+                    </div>
+
+                    <div id="ballHistory"
+                         class="mt-2">
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- MATCH AWARDS -->
+            <div id="awardSection" class="award-card mb-3">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div class="award-icon">🏆</div>
+                    <div>
+                        <div class="fw-bold fs-5">Player of the Match</div>
+                        <div class="small text-muted">Choose the standout player when the match is complete.</div>
+                    </div>
+                </div>
+                <select id="manOfMatchSelect" class="form-select mb-2">
+                    <option value="">Select player</option>
+                </select>
+                <button id="saveAward" class="btn btn-warning w-100">⭐ Save Player of the Match</button>
+            </div>
+
+            <!-- INNINGS CONTROLS -->
+
+            <div class="card shadow-sm mb-3">
+
+                <div class="card-body">
+
+                    <button id="endInnings"
+                            class="btn btn-dark w-100 mb-2">
+
+                        End Innings
+
+                    </button>
+
+                    <button id="finishMatch"
+                            class="btn btn-danger w-100">
+
+                        Finish Match
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script type="module">
+
+import { db } from "./firebase-config.js";
+
+import {
+    doc,
+    getDoc,
+    updateDoc,
+    collection,
+    getDocs,
+    addDoc,
+    query,
+    where,
+    orderBy,
+    limit,
+    serverTimestamp,
+    onSnapshot
+}
+from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+import { protectAdminPage }
+from "./auth.js";
+
+
+protectAdminPage();
+
+
+const params =
+    new URLSearchParams(location.search);
+
+const matchId =
+    params.get("matchId");
+
+
+if (!matchId) {
+
+    alert("Match ID missing.");
+
+    location.href = "matches.html";
+
+}
+
+
+let match = null;
+
+let players = [];
+
+let selectedXI_A = [];
+
+let selectedXI_B = [];
+
+let tossWinner = "";
+
+let currentInnings = 0;
+
+let ballHistory = [];
+
+let currentBatter1 = null;
+
+let currentBatter2 = null;
+
+let currentBowler = null;
+
+
+/* LOAD MATCH */
+
+async function loadMatch() {
+
+    const matchRef =
+        doc(db, "matches", matchId);
+
+    onSnapshot(matchRef, async snapshot => {
+
+        if (!snapshot.exists()) {
+
+            alert("Match not found.");
+
+            location.href =
+                "matches.html";
+
+            return;
+
+        }
+
+        match = {
+
+            id: snapshot.id,
+
+            ...snapshot.data()
+
+        };
+
+
+        await loadPlayers();
+
+        renderMatch();
+
+    });
+
+}
+
+
+/* LOAD PLAYERS */
+
+async function loadPlayers() {
+
+    const snapshot =
+        await getDocs(
+            collection(db, "players")
+        );
+
+
+    players = [];
+
+    snapshot.forEach(item => {
+
+        players.push({
+
+            id: item.id,
+
+            ...item.data()
+
+        });
+
+    });
+
+}
+
+
+function renderAwardOptions(){
+    const select=document.getElementById("manOfMatchSelect");
+    if(!select) return;
+    const ids=[...(match.playingXI?.teamA||[]),...(match.playingXI?.teamB||[])];
+    const list=players.filter(p=>ids.includes(p.id));
+    select.innerHTML='<option value="">Select player</option>'+list.map(p=>`<option value="${p.id}">${p.name||"Player"}${p.jerseyNumber ? ` • #${p.jerseyNumber}` : ""}</option>`).join("");
+    if(match.manOfMatchId) select.value=match.manOfMatchId;
+}
+
+/* RENDER */
+
+function renderMatch() {
+
+    document
+        .getElementById("loading")
+        .classList.add("d-none");
+
+    document
+        .getElementById("app")
+        .classList.remove("d-none");
+
+    renderAwardOptions();
+
+
+    document.getElementById("tournamentName")
+        .textContent =
+        match.tournamentName || "";
+
+
+    document.getElementById("teamAName")
+        .textContent =
+        match.teamAName || "Team A";
+
+
+    document.getElementById("teamBName")
+        .textContent =
+        match.teamBName || "Team B";
+
+
+    document.getElementById("matchInfo")
+        .textContent =
+        `${match.date || ""} • ${match.time || ""} • ${match.venue || ""}`;
+
+
+    document.getElementById("tossA")
+        .textContent =
+        match.teamAName;
+
+
+    document.getElementById("tossB")
+        .textContent =
+        match.teamBName;
+
+
+    document.getElementById("battingFirst").innerHTML = `
+
+        <option value="">
+            Select team
+        </option>
+
+        <option value="${match.teamAId}">
+            ${match.teamAName}
+        </option>
+
+        <option value="${match.teamBId}">
+            ${match.teamBName}
+        </option>
+
+    `;
+
+
+    if (
+        match.status === "UPCOMING"
+    ) {
+
+        document
+            .getElementById("tossSection")
+            .classList.remove("d-none");
+
+        document
+            .getElementById("playingXISection")
+            .classList.add("d-none");
+
+        document
+            .getElementById("scoreSection")
+            .classList.add("d-none");
+
+    }
+
+
+    if (
+        match.status === "XI_SELECTION"
+    ) {
+
+        document
+            .getElementById("tossSection")
+            .classList.add("d-none");
+
+        document
+            .getElementById("playingXISection")
+            .classList.remove("d-none");
+
+        document
+            .getElementById("scoreSection")
+            .classList.add("d-none");
+
+
+        renderXI();
+
+    }
+
+
+    if (
+        match.status === "LIVE"
+    ) {
+
+        document
+            .getElementById("tossSection")
+            .classList.add("d-none");
+
+        document
+            .getElementById("playingXISection")
+            .classList.add("d-none");
+
+        document
+            .getElementById("scoreSection")
+            .classList.remove("d-none");
+
+
+        renderScore();
+
+    }
+
+}
+
+
+/* TOSS */
+
+document.getElementById("tossA")
+.addEventListener("click", () => {
+
+    tossWinner = match.teamAId;
+
+    document.getElementById("tossA")
+        .classList.add("btn-primary");
+
+    document.getElementById("tossB")
+        .classList.remove("btn-primary");
+
+});
+
+
+document.getElementById("tossB")
+.addEventListener("click", () => {
+
+    tossWinner = match.teamBId;
+
+    document.getElementById("tossB")
+        .classList.add("btn-primary");
+
+    document.getElementById("tossA")
+        .classList.remove("btn-primary");
+
+});
+
+
+/* START MATCH */
+
+document.getElementById("startMatch")
+.addEventListener("click", async () => {
+
+    const battingFirst =
+        document.getElementById("battingFirst")
+        .value;
+
+
+    if (!tossWinner) {
+
+        alert("Select toss winner.");
+
+        return;
+
+    }
+
+
+    if (!battingFirst) {
+
+        alert("Select batting first team.");
+
+        return;
+
+    }
+
+
+    await updateDoc(
+        doc(db, "matches", matchId),
+        {
+
+            tossWinnerId:
+                tossWinner,
+
+            battingFirstId:
+                battingFirst,
+
+            status:
+                "XI_SELECTION",
+
+            currentInnings:
+                1,
+
+            updatedAt:
+                serverTimestamp()
+
+        }
+    );
+
+});
+
+
+/* PLAYING XI */
+
+function renderXI() {
+
+    document.getElementById("xiTeamAName")
+        .textContent =
+        match.teamAName;
+
+
+    document.getElementById("xiTeamBName")
+        .textContent =
+        match.teamBName;
+
+
+    const teamAPlayers =
+        players.filter(
+            p =>
+                p.teamId === match.teamAId
+        );
+
+
+    const teamBPlayers =
+        players.filter(
+            p =>
+                p.teamId === match.teamBId
+        );
+
+
+    renderPlayerSelection(
+        teamAPlayers,
+        "xiTeamA",
+        selectedXI_A
+    );
+
+
+    renderPlayerSelection(
+        teamBPlayers,
+        "xiTeamB",
+        selectedXI_B
+    );
+
+}
+
+
+function renderPlayerSelection(
+    list,
+    containerId,
+    selected
+) {
+
+    const container =
+        document.getElementById(containerId);
+
+
+    container.innerHTML =
+        list.map(player => {
+
+            const checked =
+                selected.includes(player.id);
+
+
+            return `
+
+            <div class="border rounded p-2 mb-2
+                        player-row
+                        ${checked ? "selected-player" : ""}"
+                 onclick="togglePlayer(
+                    '${player.id}',
+                    '${containerId}'
+                 )">
+
+                <div class="d-flex
+                            justify-content-between">
+
+                    <span>
+                        ${player.name}
+                    </span>
+
+                    <span>
+                        ${checked ? "✅" : "⬜"}
+                    </span>
+
+                </div>
+
+                <div class="small-stat">
+
+                    ${player.role || ""}
+
+                    ${
+                        player.jerseyNumber
+                        ?
+                        " • #" + player.jerseyNumber
+                        :
+                        ""
+                    }
+
+                </div>
+
+            </div>
+
+            `;
+
+        }).join("");
+
+}
+
+
+window.togglePlayer =
+function(id, containerId) {
+
+    const selected =
+        containerId === "xiTeamA"
+        ? selectedXI_A
+        : selectedXI_B;
+
+
+    const index =
+        selected.indexOf(id);
+
+
+    if (index >= 0) {
+
+        selected.splice(index, 1);
+
+    } else {
+
+        if (selected.length >= 11) {
+
+            alert(
+                "Maximum 11 players."
+            );
+
+            return;
+
+        }
+
+        selected.push(id);
+
+    }
+
+
+    renderXI();
+
+};
+
+
+/* ANNOUNCE XI */
+
+document.getElementById("announceXI")
+.addEventListener("click", async () => {
+
+    if (selectedXI_A.length !== 11) {
+
+        alert(
+            "Select exactly 11 players for Team A."
+        );
+
+        return;
+
+    }
+
+
+    if (selectedXI_B.length !== 11) {
+
+        alert(
+            "Select exactly 11 players for Team B."
+        );
+
+        return;
+
+    }
+
+
+    await updateDoc(
+
+        doc(
+            db,
+            "matches",
+            matchId
+        ),
+
+        {
+
+            playingXI: {
+
+                teamA:
+                    selectedXI_A,
+
+                teamB:
+                    selectedXI_B
+
+            },
+
+            playingXIAnnounced:
+                true,
+
+            status:
+                "LIVE",
+
+            updatedAt:
+                serverTimestamp()
+
+        }
+
+    );
+
+});
+
+
+/* SCORE */
+
+function getBattingTeamId() {
+
+    return match.currentInnings === 1
+        ? match.battingFirstId
+        : (
+            match.battingFirstId === match.teamAId
+            ? match.teamBId
+            : match.teamAId
+        );
+
+}
+
+
+function getBowlingTeamId() {
+
+    const batting =
+        getBattingTeamId();
+
+    return batting === match.teamAId
+        ? match.teamBId
+        : match.teamAId;
+
+}
+
+
+function getScoreData() {
+
+    const batting =
+        getBattingTeamId();
+
+
+    if (batting === match.teamAId) {
+
+        return {
+
+            score:
+                match.teamAScore || 0,
+
+            wickets:
+                match.teamAWickets || 0,
+
+            balls:
+                match.teamABalls || 0
+
+        };
+
+    }
+
+
+    return {
+
+        score:
+            match.teamBScore || 0,
+
+        wickets:
+            match.teamBWickets || 0,
+
+        balls:
+            match.teamBBalls || 0
+
+    };
+
+}
+
+
+function renderScore() {
+
+    const batting =
+        getBattingTeamId();
+
+
+    const battingName =
+        batting === match.teamAId
+        ? match.teamAName
+        : match.teamBName;
+
+
+    const data =
+        getScoreData();
+
+
+    document.getElementById("battingTeam")
+        .textContent =
+        battingName;
+
+
+    document.getElementById("score")
+        .textContent =
+        data.score;
+
+
+    document.getElementById("wickets")
+        .textContent =
+        data.wickets;
+
+
+    document.getElementById("overs")
+        .textContent =
+        `${Math.floor(data.balls / 6)}.${data.balls % 6}`;
+
+
+    const target =
+        match.currentInnings === 2
+        ? (
+            match.battingFirstId === match.teamAId
+            ? (match.teamAScore || 0) + 1
+            : (match.teamBScore || 0) + 1
+        )
+        : 0;
+
+
+    document.getElementById("targetText")
+        .textContent =
+        target
+        ? `Target: ${target}`
+        : "";
+
+
+    renderBatters();
+
+    renderBowler();
+
+}
+
+
+/* BATTERS */
+
+function renderBatters() {
+
+    const container =
+        document.getElementById("batters");
+
+
+    const batting =
+        getBattingTeamId();
+
+
+    const xi =
+        batting === match.teamAId
+        ? (match.playingXI?.teamA || [])
+        : (match.playingXI?.teamB || []);
+
+
+    if (!currentBatter1 && xi.length) {
+
+        currentBatter1 =
+            players.find(
+                p => p.id === xi[0]
+            );
+
+    }
+
+
+    if (!currentBatter2 && xi.length > 1) {
+
+        currentBatter2 =
+            players.find(
+                p => p.id === xi[1]
+            );
+
+    }
+
+
+    container.innerHTML = `
+
+        <div class="border rounded p-3 mb-2">
+
+            <strong>
+                ${currentBatter1?.name || "Select batter"}
+            </strong>
+
+            <div class="small text-muted">
+                On Strike
+            </div>
+
+        </div>
+
+
+        <div class="border rounded p-3">
+
+            <strong>
+                ${currentBatter2?.name || "Select batter"}
+            </strong>
+
+            <div class="small text-muted">
+                Non-Striker
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+/* BOWLER */
+
+function renderBowler() {
+
+    const select =
+        document.getElementById("bowlerSelect");
+
+
+    const bowlingTeam =
+        getBowlingTeamId();
+
+
+    const xi =
+        bowlingTeam === match.teamAId
+        ? (match.playingXI?.teamA || [])
+        : (match.playingXI?.teamB || []);
+
+
+    select.innerHTML = `
+        <option value="">
+            Select bowler
+        </option>
+    `;
+
+
+    xi.forEach(id => {
+
+        const player =
+            players.find(
+                p => p.id === id
+            );
+
+
+        if (player) {
+
+            select.innerHTML += `
+
+                <option value="${player.id}">
+                    ${player.name}
+                </option>
+
+            `;
+
+        }
+
+    });
+
+
+    if (currentBowler) {
+
+        select.value =
+            currentBowler.id;
+
+    }
+
+}
+
+
+document.getElementById("bowlerSelect")
+.addEventListener("change", e => {
+
+    currentBowler =
+        players.find(
+            p => p.id === e.target.value
+        );
+
+});
+
+
+/* ADD NORMAL RUN */
+
+window.addRuns = async function(runs) {
+
+    await processBall({
+
+        runs: runs,
+
+        extra: 0,
+
+        extraType: null,
+
+        legalBall: true,
+
+        wicket: false
+
+    });
+
+};
+
+
+/* EXTRAS */
+
+window.addExtra = async function(type) {
+
+    let runs = 1;
+
+    let legalBall = true;
+
+
+    if (
+        type === "wide" ||
+        type === "noball"
+    ) {
+
+        legalBall = false;
+
+    }
+
+
+    await processBall({
+
+        runs: 0,
+
+        extra: runs,
+
+        extraType: type,
+
+        legalBall: legalBall,
+
+        wicket: false
+
+    });
+
+};
+
+
+/* WICKET */
+
+window.addWicket = async function() {
+
+    await processBall({
+
+        runs: 0,
+
+        extra: 0,
+
+        extraType: null,
+
+        legalBall: true,
+
+        wicket: true
+
+    });
+
+};
+
+
+/* PROCESS BALL */
+
+async function processBall(ball) {
+
+    const batting =
+        getBattingTeamId();
+
+
+    const data =
+        getScoreData();
+
+
+    let newScore =
+        data.score +
+        ball.runs +
+        ball.extra;
+
+
+    let newWickets =
+        data.wickets +
+        (ball.wicket ? 1 : 0);
+
+
+    let newBalls =
+        data.balls +
+        (ball.legalBall ? 1 : 0);
+
+
+    const updateData = {};
+
+
+    if (batting === match.teamAId) {
+
+        updateData.teamAScore =
+            newScore;
+
+        updateData.teamAWickets =
+            newWickets;
+
+        updateData.teamABalls =
+            newBalls;
+
+    } else {
+
+        updateData.teamBScore =
+            newScore;
+
+        updateData.teamBWickets =
+            newWickets;
+
+        updateData.teamBBalls =
+            newBalls;
+
+    }
+
+
+    updateData.updatedAt =
+        serverTimestamp();
+
+
+    await updateDoc(
+
+        doc(
+            db,
+            "matches",
+            matchId
+        ),
+
+        updateData
+
+    );
+
+
+    /* SAVE BALL */
+
+    await addDoc(
+
+        collection(
+            db,
+            "matches",
+            matchId,
+            "balls"
+        ),
+
+        {
+
+            innings:
+                match.currentInnings,
+
+            battingTeamId:
+                batting,
+
+            runs:
+                ball.runs,
+
+            extra:
+                ball.extra,
+
+            extraType:
+                ball.extraType,
+
+            legalBall:
+                ball.legalBall,
+
+            wicket:
+                ball.wicket,
+
+            batterId:
+                currentBatter1?.id || "",
+
+            bowlerId:
+                currentBowler?.id || "",
+
+            createdAt:
+                serverTimestamp()
+
+        }
+
+    );
+
+
+    /* STRIKE CHANGE */
+
+    if (
+        ball.legalBall &&
+        ball.runs % 2 === 1
+    ) {
+
+        swapStrike();
+
+    }
+
+
+    /* OVER COMPLETE */
+
+    if (
+        ball.legalBall &&
+        newBalls % 6 === 0
+    ) {
+
+        alert("Over completed. Change bowler.");
+
+    }
+
+
+    /* ALL OUT */
+
+    if (newWickets >= 10) {
+
+        alert("All out!");
+
+    }
+
+}
+
+
+/* STRIKE */
+
+function swapStrike() {
+
+    const temp =
+        currentBatter1;
+
+    currentBatter1 =
+        currentBatter2;
+
+    currentBatter2 =
+        temp;
+
+}
+
+
+/* UNDO */
+
+window.undoLastBall =
+async function() {
+
+    const ballsRef =
+        collection(
+            db,
+            "matches",
+            matchId,
+            "balls"
+        );
+
+
+    const q =
+        query(
+            ballsRef,
+            orderBy("createdAt", "desc"),
+            limit(1)
+        );
+
+
+    const snapshot =
+        await getDocs(q);
+
+
+    if (snapshot.empty) {
+
+        alert("No ball to undo.");
+
+        return;
+
+    }
+
+
+    const ballDoc =
+        snapshot.docs[0];
+
+
+    const ball =
+        ballDoc.data();
+
+
+    const batting =
+        ball.battingTeamId;
+
+
+    const score =
+        batting === match.teamAId
+        ? match.teamAScore || 0
+        : match.teamBScore || 0;
+
+
+    const wickets =
+        batting === match.teamAId
+        ? match.teamAWickets || 0
+        : match.teamBWickets || 0;
+
+
+    const ballsCount =
+        batting === match.teamAId
+        ? match.teamABalls || 0
+        : match.teamBBalls || 0;
+
+
+    const updateData = {};
+
+
+    const previousScore =
+        Math.max(
+            0,
+            score -
+            ball.runs -
+            ball.extra
+        );
+
+
+    const previousWickets =
+        Math.max(
+            0,
+            wickets -
+            (ball.wicket ? 1 : 0)
+        );
+
+
+    const previousBalls =
+        Math.max(
+            0,
+            ballsCount -
+            (ball.legalBall ? 1 : 0)
+        );
+
+
+    if (batting === match.teamAId) {
+
+        updateData.teamAScore =
+            previousScore;
+
+        updateData.teamAWickets =
+            previousWickets;
+
+        updateData.teamABalls =
+            previousBalls;
+
+    } else {
+
+        updateData.teamBScore =
+            previousScore;
+
+        updateData.teamBWickets =
+            previousWickets;
+
+        updateData.teamBBalls =
+            previousBalls;
+
+    }
+
+
+    await updateDoc(
+
+        doc(
+            db,
+            "matches",
+            matchId
+        ),
+
+        updateData
+
+    );
+
+
+    /* DELETE BALL */
+
+    const {
+        deleteDoc
+    } =
+        await import(
+            "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"
+        );
+
+
+    await deleteDoc(ballDoc.ref);
+
+
+    alert("Last ball undone.");
+
+};
+
+
+document.getElementById("saveAward").addEventListener("click", async ()=>{
+    const id=document.getElementById("manOfMatchSelect").value;
+    if(!id){ alert("Select a Player of the Match first."); return; }
+    const player=players.find(p=>p.id===id);
+    await updateDoc(doc(db,"matches",matchId),{manOfMatchId:id,manOfMatchName:player?.name||"",updatedAt:serverTimestamp()});
+    alert(`⭐ Player of the Match saved: ${player?.name||"Player"}`);
+});
+
+/* END INNINGS */
+
+document.getElementById("endInnings")
+.addEventListener("click", async () => {
+
+    if (!confirm("End this innings?"))
+        return;
+
+
+    if (match.currentInnings === 1) {
+
+        await updateDoc(
+
+            doc(
+                db,
+                "matches",
+                matchId
+            ),
+
+            {
+
+                currentInnings: 2,
+
+                updatedAt:
+                    serverTimestamp()
+
+            }
+
+        );
+
+    } else {
+
+        await finishMatch();
+
+    }
+
+});
+
+
+/* FINISH MATCH */
+
+document.getElementById("finishMatch")
+.addEventListener(
+    "click",
+    finishMatch
+);
+
+
+async function finishMatch() {
+
+    if (!confirm("Finish this match?"))
+        return;
+
+
+    let winner = "";
+
+    const scoreA =
+        match.teamAScore || 0;
+
+    const scoreB =
+        match.teamBScore || 0;
+
+
+    if (scoreA > scoreB) {
+
+        winner =
+            match.teamAName;
+
+    } else if (scoreB > scoreA) {
+
+        winner =
+            match.teamBName;
+
+    } else {
+
+        winner =
+            "DRAW";
+
+    }
+
+
+    await updateDoc(
+
+        doc(
+            db,
+            "matches",
+            matchId
+        ),
+
+        {
+
+            status:
+                "COMPLETED",
+
+            winner:
+                winner,
+
+            updatedAt:
+                serverTimestamp()
+
+        }
+
+    );
+
+
+    alert(
+        `Match completed: ${winner}`
+    );
+
+}
+
+
+loadMatch();
+
+</script>
+
+</body>
+</html>

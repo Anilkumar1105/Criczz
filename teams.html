@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Teams</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+
+    <style>
+
+        body {
+            background: #f5f7fb;
+        }
+
+        .navbar {
+            background: #111827;
+        }
+
+        .card {
+            border: 0;
+            border-radius: 15px;
+        }
+
+        .team-logo {
+            width: 55px;
+            height: 55px;
+            object-fit: cover;
+            border-radius: 50%;
+            background: #eee;
+        }
+
+    </style>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<nav class="navbar navbar-dark px-3">
+
+    <span class="navbar-brand fw-bold">
+        🏏 Cricket Admin
+    </span>
+
+    <a href="admin.html"
+       class="btn btn-outline-light btn-sm">
+        Dashboard
+    </a>
+
+</nav>
+
+
+<div class="container py-4">
+
+    <h3 class="fw-bold mb-3">Teams</h3>
+
+
+    <!-- FORM -->
+
+    <div class="card shadow-sm p-3 mb-4">
+
+        <h5 id="formTitle">Add Team</h5>
+
+        <form id="teamForm">
+
+            <input type="hidden" id="teamId">
+
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Tournament
+                </label>
+
+                <select id="tournamentId"
+                        class="form-select"
+                        required>
+
+                    <option value="">
+                        Select Tournament
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Team Name
+                </label>
+
+                <input type="text"
+                       id="name"
+                       class="form-control"
+                       placeholder="Regani Gudem Kings"
+                       required>
+
+            </div>
+
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Short Name
+                </label>
+
+                <input type="text"
+                       id="shortName"
+                       class="form-control"
+                       placeholder="RGK"
+                       maxlength="5">
+
+            </div>
+
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Team Logo URL
+                </label>
+
+                <input type="url"
+                       id="logoUrl"
+                       class="form-control"
+                       placeholder="https://...">
+
+            </div>
+
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Team Banner URL
+                </label>
+
+                <input type="url"
+                       id="bannerUrl"
+                       class="form-control"
+                       placeholder="https://...">
+
+            </div>
+
+
+            <div class="row">
+
+                <div class="col-6 mb-3">
+
+                    <label class="form-label">
+                        Primary Color
+                    </label>
+
+                    <input type="color"
+                           id="primaryColor"
+                           class="form-control form-control-color"
+                           value="#0d6efd">
+
+                </div>
+
+
+                <div class="col-6 mb-3">
+
+                    <label class="form-label">
+                        Secondary Color
+                    </label>
+
+                    <input type="color"
+                           id="secondaryColor"
+                           class="form-control form-control-color"
+                           value="#ffffff">
+
+                </div>
+
+            </div>
+
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Captain
+                </label>
+
+                <input type="text"
+                       id="captain"
+                       class="form-control">
+
+            </div>
+
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Vice Captain
+                </label>
+
+                <input type="text"
+                       id="viceCaptain"
+                       class="form-control">
+
+            </div>
+
+
+            <button class="btn btn-primary w-100">
+                Save Team
+            </button>
+
+
+            <button type="button"
+                    id="cancelEdit"
+                    class="btn btn-secondary w-100 mt-2 d-none">
+
+                Cancel Edit
+
+            </button>
+
+        </form>
+
+    </div>
+
+
+    <!-- LIST -->
+
+    <div class="card shadow-sm p-3">
+
+        <h5>Team List</h5>
+
+        <div id="teamList">
+            Loading...
+        </div>
+
+    </div>
+
+</div>
+
+
+<script type="module">
+
+import { db } from "./firebase-config.js";
+
+import {
+    collection,
+    addDoc,
+    getDocs,
+    doc,
+    updateDoc,
+    deleteDoc,
+    serverTimestamp
+}
+from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+import { protectAdminPage }
+from "./auth.js";
+
+
+protectAdminPage();
+
+
+let tournaments = [];
+
+let teams = [];
+
+
+const form = document.getElementById("teamForm");
+
+const teamId = document.getElementById("teamId");
+
+const tournamentSelect =
+    document.getElementById("tournamentId");
+
+const teamList =
+    document.getElementById("teamList");
+
+const cancelEdit =
+    document.getElementById("cancelEdit");
+
+
+async function loadTournaments() {
+
+    const snapshot =
+        await getDocs(collection(db, "tournaments"));
+
+    tournaments = [];
+
+    tournamentSelect.innerHTML = `
+        <option value="">
+            Select Tournament
+        </option>
+    `;
+
+    snapshot.forEach(item => {
+
+        const t = {
+            id: item.id,
+            ...item.data()
+        };
+
+        tournaments.push(t);
+
+        tournamentSelect.innerHTML += `
+            <option value="${t.id}">
+                ${t.name}
+            </option>
+        `;
+
+    });
+
+}
+
+
+async function loadTeams() {
+
+    const snapshot =
+        await getDocs(collection(db, "teams"));
+
+    teams = [];
+
+    snapshot.forEach(item => {
+
+        teams.push({
+            id: item.id,
+            ...item.data()
+        });
+
+    });
+
+    renderTeams();
+
+}
+
+
+function renderTeams() {
+
+    if (teams.length === 0) {
+
+        teamList.innerHTML =
+            `<p class="text-muted">No teams created.</p>`;
+
+        return;
+
+    }
+
+
+    teamList.innerHTML = teams.map(team => {
+
+        const tournament =
+            tournaments.find(
+                t => t.id === team.tournamentId
+            );
+
+
+        return `
+
+        <div class="border rounded-3 p-3 mb-3">
+
+            <div class="d-flex align-items-center gap-3">
+
+                ${
+                    team.logoUrl
+                    ?
+                    `<img src="${team.logoUrl}"
+                          class="team-logo">`
+                    :
+                    `<div class="team-logo
+                                d-flex
+                                align-items-center
+                                justify-content-center">
+                        🏏
+                    </div>`
+                }
+
+
+                <div>
+
+                    <h5 class="mb-1">
+                        ${team.name || ""}
+                    </h5>
+
+                    <small class="text-muted">
+                        ${team.shortName || ""}
+                    </small>
+
+                    <br>
+
+                    <small>
+                        ${tournament?.name || "No tournament"}
+                    </small>
+
+                </div>
+
+            </div>
+
+
+            <div class="mt-3">
+
+                <span class="badge bg-dark">
+                    Captain:
+                    ${team.captain || "Not assigned"}
+                </span>
+
+            </div>
+
+
+            <div class="d-flex gap-2 mt-3">
+
+                <button
+                    class="btn btn-warning btn-sm"
+                    onclick="editTeam('${team.id}')">
+
+                    Edit
+
+                </button>
+
+
+                <button
+                    class="btn btn-danger btn-sm"
+                    onclick="deleteTeam('${team.id}')">
+
+                    Delete
+
+                </button>
+
+            </div>
+
+        </div>
+
+        `;
+
+    }).join("");
+
+}
+
+
+form.addEventListener("submit", async e => {
+
+    e.preventDefault();
+
+
+    const selectedTournament =
+        tournaments.find(
+            t => t.id === tournamentSelect.value
+        );
+
+
+    const data = {
+
+        tournamentId: tournamentSelect.value,
+
+        tournamentName:
+            selectedTournament?.name || "",
+
+        name:
+            document.getElementById("name").value.trim(),
+
+        shortName:
+            document.getElementById("shortName").value
+            .trim()
+            .toUpperCase(),
+
+        logoUrl:
+            document.getElementById("logoUrl").value.trim(),
+
+        bannerUrl:
+            document.getElementById("bannerUrl").value.trim(),
+
+        primaryColor:
+            document.getElementById("primaryColor").value,
+
+        secondaryColor:
+            document.getElementById("secondaryColor").value,
+
+        captain:
+            document.getElementById("captain").value.trim(),
+
+        viceCaptain:
+            document.getElementById("viceCaptain").value.trim(),
+
+        updatedAt: serverTimestamp()
+
+    };
+
+
+    try {
+
+        if (teamId.value) {
+
+            await updateDoc(
+                doc(db, "teams", teamId.value),
+                data
+            );
+
+            alert("Team updated!");
+
+        } else {
+
+            data.createdAt = serverTimestamp();
+
+            await addDoc(
+                collection(db, "teams"),
+                data
+            );
+
+            alert("Team created!");
+
+        }
+
+
+        resetForm();
+
+        loadTeams();
+
+    } catch (error) {
+
+        console.error(error);
+
+        alert(error.message);
+
+    }
+
+});
+
+
+window.editTeam = function(id) {
+
+    const team =
+        teams.find(t => t.id === id);
+
+    if (!team) return;
+
+
+    teamId.value = id;
+
+    tournamentSelect.value =
+        team.tournamentId || "";
+
+    document.getElementById("name").value =
+        team.name || "";
+
+    document.getElementById("shortName").value =
+        team.shortName || "";
+
+    document.getElementById("logoUrl").value =
+        team.logoUrl || "";
+
+    document.getElementById("bannerUrl").value =
+        team.bannerUrl || "";
+
+    document.getElementById("primaryColor").value =
+        team.primaryColor || "#0d6efd";
+
+    document.getElementById("secondaryColor").value =
+        team.secondaryColor || "#ffffff";
+
+    document.getElementById("captain").value =
+        team.captain || "";
+
+    document.getElementById("viceCaptain").value =
+        team.viceCaptain || "";
+
+
+    document.getElementById("formTitle").textContent =
+        "Edit Team";
+
+    cancelEdit.classList.remove("d-none");
+
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+
+};
+
+
+window.deleteTeam = async function(id) {
+
+    if (!confirm("Delete this team?")) return;
+
+    await deleteDoc(
+        doc(db, "teams", id)
+    );
+
+    loadTeams();
+
+};
+
+
+function resetForm() {
+
+    form.reset();
+
+    teamId.value = "";
+
+    document.getElementById("primaryColor").value =
+        "#0d6efd";
+
+    document.getElementById("secondaryColor").value =
+        "#ffffff";
+
+    document.getElementById("formTitle").textContent =
+        "Add Team";
+
+    cancelEdit.classList.add("d-none");
+
+}
+
+
+cancelEdit.addEventListener(
+    "click",
+    resetForm
+);
+
+
+await loadTournaments();
+
+await loadTeams();
+
+</script>
+
+</body>
+</html>

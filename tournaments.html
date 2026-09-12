@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tournaments</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background: #f5f7fb;
+        }
+
+        .navbar {
+            background: #111827;
+        }
+
+        .card {
+            border: 0;
+            border-radius: 15px;
+        }
+
+        .tournament-logo {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 12px;
+            background: #eee;
+        }
+    </style>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<nav class="navbar navbar-dark px-3">
+    <span class="navbar-brand fw-bold">🏏 Cricket Admin</span>
+    <a href="admin.html" class="btn btn-outline-light btn-sm">Dashboard</a>
+</nav>
+
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="fw-bold">Tournaments</h3>
+    </div>
+
+    <!-- ADD / EDIT -->
+    <div class="card shadow-sm p-3 mb-4">
+
+        <h5 id="formTitle">Add Tournament</h5>
+
+        <form id="tournamentForm">
+
+            <input type="hidden" id="tournamentId">
+
+            <div class="mb-3">
+                <label class="form-label">Tournament Name</label>
+                <input type="text" id="name" class="form-control"
+                       placeholder="Ganesh Premier League" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Logo URL</label>
+                <input type="url" id="logoUrl" class="form-control"
+                       placeholder="https://...">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Banner URL</label>
+                <input type="url" id="bannerUrl" class="form-control"
+                       placeholder="https://...">
+            </div>
+
+            <div class="row">
+
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Venue</label>
+                    <input type="text" id="venue" class="form-control"
+                           placeholder="Regani Gudem">
+                </div>
+
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" id="startDate" class="form-control">
+                </div>
+
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">End Date</label>
+                    <input type="date" id="endDate" class="form-control">
+                </div>
+
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Overs Per Match</label>
+                <input type="number" id="overs" class="form-control"
+                       value="10" min="1">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Rules</label>
+                <textarea id="rules" class="form-control"
+                          rows="4"
+                          placeholder="Tournament rules..."></textarea>
+            </div>
+
+            <button class="btn btn-primary w-100" type="submit">
+                Save Tournament
+            </button>
+
+            <button type="button"
+                    id="cancelEdit"
+                    class="btn btn-secondary w-100 mt-2 d-none">
+                Cancel Edit
+            </button>
+
+        </form>
+    </div>
+
+
+    <!-- TOURNAMENT LIST -->
+
+    <div class="card shadow-sm p-3">
+
+        <h5 class="mb-3">Tournament List</h5>
+
+        <div id="tournamentList">
+            Loading...
+        </div>
+
+    </div>
+
+</div>
+
+
+<script type="module">
+
+import { db } from "./firebase-config.js";
+
+import {
+    collection,
+    addDoc,
+    getDocs,
+    doc,
+    updateDoc,
+    deleteDoc,
+    serverTimestamp
+}
+from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+import { protectAdminPage }
+from "./auth.js";
+
+protectAdminPage();
+
+
+const form = document.getElementById("tournamentForm");
+
+const list = document.getElementById("tournamentList");
+
+const tournamentId = document.getElementById("tournamentId");
+
+const cancelEdit = document.getElementById("cancelEdit");
+
+let tournaments = [];
+
+
+async function loadTournaments() {
+
+    list.innerHTML = "Loading...";
+
+    const snapshot = await getDocs(
+        collection(db, "tournaments")
+    );
+
+    tournaments = [];
+
+    snapshot.forEach(item => {
+
+        tournaments.push({
+            id: item.id,
+            ...item.data()
+        });
+
+    });
+
+    renderTournaments();
+}
+
+
+function renderTournaments() {
+
+    if (tournaments.length === 0) {
+
+        list.innerHTML = `
+            <div class="text-center text-muted py-4">
+                No tournaments created yet.
+            </div>
+        `;
+
+        return;
+    }
+
+
+    list.innerHTML = tournaments.map(t => `
+
+        <div class="border rounded-3 p-3 mb-3">
+
+            <div class="d-flex gap-3 align-items-center">
+
+                ${
+                    t.logoUrl
+                    ?
+                    `<img src="${t.logoUrl}"
+                          class="tournament-logo"
+                          onerror="this.style.display='none'">`
+                    :
+                    `<div class="tournament-logo d-flex align-items-center justify-content-center">
+                        🏏
+                    </div>`
+                }
+
+                <div class="flex-grow-1">
+
+                    <h5 class="mb-1">${t.name || ""}</h5>
+
+                    <small class="text-muted">
+                        ${t.venue || "Venue not set"}
+                    </small>
+
+                    <br>
+
+                    <small>
+                        ${t.overs || 0} Overs
+                    </small>
+
+                </div>
+
+            </div>
+
+            <div class="d-flex gap-2 mt-3">
+
+                <button class="btn btn-warning btn-sm"
+                        onclick="editTournament('${t.id}')">
+                    Edit
+                </button>
+
+                <button class="btn btn-danger btn-sm"
+                        onclick="deleteTournament('${t.id}')">
+                    Delete
+                </button>
+
+            </div>
+
+        </div>
+
+    `).join("");
+}
+
+
+form.addEventListener("submit", async (e) => {
+
+    e.preventDefault();
+
+    const data = {
+
+        name: document.getElementById("name").value.trim(),
+
+        logoUrl: document.getElementById("logoUrl").value.trim(),
+
+        bannerUrl: document.getElementById("bannerUrl").value.trim(),
+
+        venue: document.getElementById("venue").value.trim(),
+
+        startDate: document.getElementById("startDate").value,
+
+        endDate: document.getElementById("endDate").value,
+
+        overs: Number(document.getElementById("overs").value),
+
+        rules: document.getElementById("rules").value.trim(),
+
+        updatedAt: serverTimestamp()
+
+    };
+
+
+    try {
+
+        if (tournamentId.value) {
+
+            await updateDoc(
+                doc(db, "tournaments", tournamentId.value),
+                data
+            );
+
+            alert("Tournament updated!");
+
+        } else {
+
+            data.createdAt = serverTimestamp();
+
+            await addDoc(
+                collection(db, "tournaments"),
+                data
+            );
+
+            alert("Tournament created!");
+
+        }
+
+
+        resetForm();
+
+        loadTournaments();
+
+    } catch (error) {
+
+        console.error(error);
+
+        alert(error.message);
+
+    }
+
+});
+
+
+window.editTournament = function(id) {
+
+    const t = tournaments.find(x => x.id === id);
+
+    if (!t) return;
+
+    tournamentId.value = id;
+
+    document.getElementById("name").value = t.name || "";
+
+    document.getElementById("logoUrl").value = t.logoUrl || "";
+
+    document.getElementById("bannerUrl").value = t.bannerUrl || "";
+
+    document.getElementById("venue").value = t.venue || "";
+
+    document.getElementById("startDate").value = t.startDate || "";
+
+    document.getElementById("endDate").value = t.endDate || "";
+
+    document.getElementById("overs").value = t.overs || 10;
+
+    document.getElementById("rules").value = t.rules || "";
+
+    document.getElementById("formTitle").textContent =
+        "Edit Tournament";
+
+    cancelEdit.classList.remove("d-none");
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+
+};
+
+
+window.deleteTournament = async function(id) {
+
+    if (!confirm("Delete this tournament?")) return;
+
+    try {
+
+        await deleteDoc(
+            doc(db, "tournaments", id)
+        );
+
+        loadTournaments();
+
+    } catch (error) {
+
+        alert(error.message);
+
+    }
+
+};
+
+
+function resetForm() {
+
+    form.reset();
+
+    tournamentId.value = "";
+
+    document.getElementById("overs").value = 10;
+
+    document.getElementById("formTitle").textContent =
+        "Add Tournament";
+
+    cancelEdit.classList.add("d-none");
+
+}
+
+
+cancelEdit.addEventListener("click", resetForm);
+
+
+loadTournaments();
+
+</script>
+
+</body>
+</html>

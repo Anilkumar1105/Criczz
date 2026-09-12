@@ -1,0 +1,43 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    // Public users can read tournament information, teams, players and matches.
+    match /tournaments/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /teams/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /players/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /matches/{id} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+
+      match /balls/{ballId} {
+        allow read: if true;
+        allow create, update, delete: if isAdmin();
+      }
+    }
+
+    // Users can read only their own profile. Admin profile is never public.
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update, delete: if isAdmin() && request.auth.uid == uid;
+    }
+  }
+}

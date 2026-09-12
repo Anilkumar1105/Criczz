@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Matches</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+
+    <style>
+
+        body {
+            background: #f5f7fb;
+        }
+
+        .navbar {
+            background: #111827;
+        }
+
+        .card {
+            border: 0;
+            border-radius: 15px;
+        }
+
+        .match-box {
+            border-left: 5px solid #0d6efd;
+        }
+
+    </style>
+
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+
+<nav class="navbar navbar-dark px-3">
+
+    <span class="navbar-brand fw-bold">
+        🏏 Admin - Cricket Matches
+    </span>
+
+    <a href="admin.html"
+       class="btn btn-outline-light btn-sm">
+        Dashboard
+    </a>
+
+</nav>
+
+
+<div class="container py-4">
+
+    <h3 class="fw-bold mb-3">
+        Matches
+    </h3>
+
+
+    <!-- FORM -->
+
+    <div class="card shadow-sm p-3 mb-4">
+
+        <h5 id="formTitle">
+            Create Match
+        </h5>
+
+
+        <form id="matchForm">
+
+            <input type="hidden" id="matchId">
+
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Tournament
+                </label>
+
+                <select id="tournamentId"
+                        class="form-select"
+                        required>
+
+                    <option value="">
+                        Select Tournament
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <div class="row">
+
+                <div class="col-md-6 mb-3">
+
+                    <label class="form-label">
+                        Team A
+                    </label>
+
+                    <select id="teamAId"
+                            class="form-select"
+                            required>
+
+                        <option value="">
+                            Select Team A
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="col-md-6 mb-3">
+
+                    <label class="form-label">
+                        Team B
+                    </label>
+
+                    <select id="teamBId"
+                            class="form-select"
+                            required>
+
+                        <option value="">
+                            Select Team B
+                        </option>
+
+                    </select>
+
+                </div>
+
+            </div>
+
+
+            <div class="row">
+
+                <div class="col-md-4 mb-3">
+
+                    <label class="form-label">
+                        Match Date
+                    </label>
+
+                    <input type="date"
+                           id="date"
+                           class="form-control"
+                           required>
+
+                </div>
+
+
+                <div class="col-md-4 mb-3">
+
+                    <label class="form-label">
+                        Match Time
+                    </label>
+
+                    <input type="time"
+                           id="time"
+                           class="form-control"
+                           required>
+
+                </div>
+
+
+                <div class="col-md-4 mb-3">
+
+                    <label class="form-label">
+                        Overs
+                    </label>
+
+                    <input type="number"
+                           id="overs"
+                           class="form-control"
+                           value="10"
+                           min="1"
+                           required>
+
+                </div>
+
+            </div>
+
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Venue
+                </label>
+
+                <input type="text"
+                       id="venue"
+                       class="form-control"
+                       placeholder="Regani Gudem Ground">
+
+            </div>
+
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Match Type</label>
+                    <select id="matchType" class="form-select">
+                        <option value="League">League Match</option>
+                        <option value="Semi Final">Semi Final</option>
+                        <option value="Final">Final</option>
+                        <option value="Practice">Practice Match</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Player of the Match</label>
+                    <input id="manOfMatchName" class="form-control" placeholder="Select after match is completed">
+                </div>
+            </div>
+
+            <button class="btn btn-primary w-100">
+                Save Match
+            </button>
+
+
+            <button type="button"
+                    id="cancelEdit"
+                    class="btn btn-secondary w-100 mt-2 d-none">
+
+                Cancel Edit
+
+            </button>
+
+        </form>
+
+    </div>
+
+
+    <!-- MATCH LIST -->
+
+    <div class="card shadow-sm p-3">
+
+        <h5>Match List</h5>
+
+        <div id="matchList">
+            Loading...
+        </div>
+
+    </div>
+
+</div>
+
+
+<script type="module">
+
+import { db } from "./firebase-config.js";
+
+import {
+    collection,
+    addDoc,
+    getDocs,
+    doc,
+    updateDoc,
+    deleteDoc,
+    serverTimestamp
+}
+from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+import { protectAdminPage }
+from "./auth.js";
+
+
+protectAdminPage();
+
+
+let tournaments = [];
+
+let teams = [];
+
+let matches = [];
+
+
+const form =
+    document.getElementById("matchForm");
+
+const matchId =
+    document.getElementById("matchId");
+
+const tournamentSelect =
+    document.getElementById("tournamentId");
+
+const teamASelect =
+    document.getElementById("teamAId");
+
+const teamBSelect =
+    document.getElementById("teamBId");
+
+const matchList =
+    document.getElementById("matchList");
+
+const cancelEdit =
+    document.getElementById("cancelEdit");
+
+
+/* LOAD TOURNAMENTS */
+
+async function loadTournaments() {
+
+    const snapshot =
+        await getDocs(
+            collection(db, "tournaments")
+        );
+
+    tournaments = [];
+
+    tournamentSelect.innerHTML = `
+        <option value="">
+            Select Tournament
+        </option>
+    `;
+
+
+    snapshot.forEach(item => {
+
+        const tournament = {
+
+            id: item.id,
+
+            ...item.data()
+
+        };
+
+
+        tournaments.push(tournament);
+
+
+        tournamentSelect.innerHTML += `
+
+            <option value="${tournament.id}">
+                ${tournament.name}
+            </option>
+
+        `;
+
+    });
+
+}
+
+
+/* LOAD TEAMS */
+
+async function loadTeams() {
+
+    const snapshot =
+        await getDocs(
+            collection(db, "teams")
+        );
+
+
+    teams = [];
+
+
+    snapshot.forEach(item => {
+
+        teams.push({
+
+            id: item.id,
+
+            ...item.data()
+
+        });
+
+    });
+
+}
+
+
+/* LOAD TEAMS FOR SELECTED TOURNAMENT */
+
+function updateTeamOptions() {
+
+    const tournamentId =
+        tournamentSelect.value;
+
+
+    const filteredTeams =
+        teams.filter(
+            team =>
+                team.tournamentId === tournamentId
+        );
+
+
+    teamASelect.innerHTML = `
+        <option value="">
+            Select Team A
+        </option>
+    `;
+
+
+    teamBSelect.innerHTML = `
+        <option value="">
+            Select Team B
+        </option>
+    `;
+
+
+    filteredTeams.forEach(team => {
+
+        teamASelect.innerHTML += `
+
+            <option value="${team.id}">
+                ${team.name}
+            </option>
+
+        `;
+
+
+        teamBSelect.innerHTML += `
+
+            <option value="${team.id}">
+                ${team.name}
+            </option>
+
+        `;
+
+    });
+
+}
+
+
+tournamentSelect.addEventListener(
+    "change",
+    updateTeamOptions
+);
+
+
+/* CREATE / UPDATE */
+
+form.addEventListener("submit", async e => {
+
+    e.preventDefault();
+
+
+    if (teamASelect.value === teamBSelect.value) {
+
+        alert(
+            "Team A and Team B cannot be the same."
+        );
+
+        return;
+
+    }
+
+
+    const tournament =
+        tournaments.find(
+            t =>
+                t.id === tournamentSelect.value
+        );
+
+
+    const teamA =
+        teams.find(
+            t =>
+                t.id === teamASelect.value
+        );
+
+
+    const teamB =
+        teams.find(
+            t =>
+                t.id === teamBSelect.value
+        );
+
+
+    const data = {
+
+        tournamentId:
+            tournamentSelect.value,
+
+        tournamentName:
+            tournament?.name || "",
+
+
+        teamAId:
+            teamASelect.value,
+
+        teamAName:
+            teamA?.name || "",
+
+        teamALogoUrl:
+            teamA?.logoUrl || "",
+
+
+        teamBId:
+            teamBSelect.value,
+
+        teamBName:
+            teamB?.name || "",
+
+        teamBLogoUrl:
+            teamB?.logoUrl || "",
+
+
+        date:
+            document.getElementById("date").value,
+
+        time:
+            document.getElementById("time").value,
+
+        venue:
+            document.getElementById("venue").value.trim(),
+
+        overs:
+            Number(
+                document.getElementById("overs").value
+            ),
+
+        matchType: document.getElementById("matchType").value || "League",
+        manOfMatchName: document.getElementById("manOfMatchName").value.trim(),
+
+        status:
+            "UPCOMING",
+
+
+        playingXI: {
+
+            teamA: [],
+
+            teamB: []
+
+        },
+
+
+        playingXIAnnounced:
+            false,
+
+
+        currentInnings:
+            0,
+
+
+        battingFirstId:
+            "",
+
+
+        tossWinnerId:
+            "",
+
+
+        teamAScore:
+            0,
+
+        teamAWickets:
+            0,
+
+        teamABalls:
+            0,
+
+
+        teamBScore:
+            0,
+
+        teamBWickets:
+            0,
+
+        teamBBalls:
+            0,
+
+
+        updatedAt:
+            serverTimestamp()
+
+    };
+
+
+    try {
+
+        if (matchId.value) {
+
+            await updateDoc(
+
+                doc(
+                    db,
+                    "matches",
+                    matchId.value
+                ),
+
+                data
+
+            );
+
+            alert("Match updated!");
+
+        } else {
+
+            data.createdAt =
+                serverTimestamp();
+
+
+            await addDoc(
+
+                collection(
+                    db,
+                    "matches"
+                ),
+
+                data
+
+            );
+
+            alert("Match created!");
+
+        }
+
+
+        resetForm();
+
+        loadMatches();
+
+    } catch (error) {
+
+        console.error(error);
+
+        alert(error.message);
+
+    }
+
+});
+
+
+/* LOAD MATCHES */
+
+async function loadMatches() {
+
+    const snapshot =
+        await getDocs(
+            collection(db, "matches")
+        );
+
+
+    matches = [];
+
+
+    snapshot.forEach(item => {
+
+        matches.push({
+
+            id: item.id,
+
+            ...item.data()
+
+        });
+
+    });
+
+
+    renderMatches();
+
+}
+
+
+/* DISPLAY MATCHES */
+
+function renderMatches() {
+
+    if (matches.length === 0) {
+
+        matchList.innerHTML = `
+            <p class="text-muted">
+                No matches created.
+            </p>
+        `;
+
+        return;
+
+    }
+
+
+    matchList.innerHTML =
+
+        matches.map(match => `
+
+        <div class="match-box
+                    border
+                    rounded-3
+                    p-3
+                    mb-3">
+
+            <div class="text-muted small">
+
+                ${match.tournamentName || ""}
+
+            </div>
+
+
+            <h5 class="fw-bold mt-1">
+
+                ${match.teamAName}
+
+                <span class="text-muted">
+                    VS
+                </span>
+
+                ${match.teamBName}
+
+            </h5>
+
+
+            <div class="small mb-2">
+
+                📅 ${match.date || "-"}
+                &nbsp;
+                ⏰ ${match.time || "-"}
+
+            </div>
+
+
+            <div class="small">
+
+                📍 ${match.venue || "Venue not set"}
+
+            </div>
+
+
+            <div class="mt-2">
+
+                <span class="badge bg-secondary">
+
+                    ${match.overs} Overs
+
+                </span>
+
+
+                <span class="badge bg-warning text-dark">
+
+                    ${match.status}
+
+                </span>
+
+            </div>
+
+
+            <div class="d-flex gap-2 mt-3">
+
+                <a
+                    href="scoring.html?matchId=${match.id}"
+                    class="btn btn-success btn-sm">
+
+                    🏏 Live Scoring
+
+                </a>
+
+
+                <button
+                    class="btn btn-warning btn-sm"
+                    onclick="editMatch('${match.id}')">
+
+                    Edit
+
+                </button>
+
+
+                <button
+                    class="btn btn-danger btn-sm"
+                    onclick="deleteMatch('${match.id}')">
+
+                    Delete
+
+                </button>
+
+            </div>
+
+        </div>
+
+        `).join("");
+
+}
+
+
+/* EDIT */
+
+window.editMatch = function(id) {
+
+    const match =
+        matches.find(
+            m => m.id === id
+        );
+
+
+    if (!match) return;
+
+
+    matchId.value = id;
+
+
+    tournamentSelect.value =
+        match.tournamentId || "";
+
+
+    updateTeamOptions();
+
+
+    teamASelect.value =
+        match.teamAId || "";
+
+    teamBSelect.value =
+        match.teamBId || "";
+
+
+    document.getElementById("date").value =
+        match.date || "";
+
+    document.getElementById("time").value =
+        match.time || "";
+
+    document.getElementById("venue").value =
+        match.venue || "";
+
+    document.getElementById("overs").value =
+        match.overs || 10;
+
+    document.getElementById("matchType").value = match.matchType || "League";
+    document.getElementById("manOfMatchName").value = match.manOfMatchName || "";
+
+
+    document.getElementById("formTitle").textContent =
+        "Edit Match";
+
+
+    cancelEdit.classList.remove("d-none");
+
+
+    window.scrollTo({
+
+        top: 0,
+
+        behavior: "smooth"
+
+    });
+
+};
+
+
+/* DELETE */
+
+window.deleteMatch = async function(id) {
+
+    if (!confirm("Delete this match?"))
+        return;
+
+
+    await deleteDoc(
+        doc(db, "matches", id)
+    );
+
+
+    loadMatches();
+
+};
+
+
+/* RESET */
+
+function resetForm() {
+
+    form.reset();
+
+    matchId.value = "";
+
+
+    document.getElementById("overs").value =
+        10;
+
+
+    document.getElementById("formTitle").textContent =
+        "Create Match";
+
+
+    cancelEdit.classList.add("d-none");
+
+
+    teamASelect.innerHTML = `
+        <option value="">
+            Select Team A
+        </option>
+    `;
+
+
+    teamBSelect.innerHTML = `
+        <option value="">
+            Select Team B
+        </option>
+    `;
+
+}
+
+
+cancelEdit.addEventListener(
+    "click",
+    resetForm
+);
+
+
+/* INITIALIZE */
+
+await loadTournaments();
+
+await loadTeams();
+
+await loadMatches();
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0">
+
+<title>Live Match</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet">
+
+<style>
+
+body {
+    background: #f1f3f6;
+}
+
+.navbar {
+    background: #111827;
+}
+
+.score-card {
+    background: #111827;
+    color: white;
+    border-radius: 20px;
+}
+
+.big-score {
+    font-size: 52px;
+    font-weight: 800;
+}
+
+.live-dot {
+    width: 10px;
+    height: 10px;
+    display: inline-block;
+    background: red;
+    border-radius: 50%;
+}
+
+.team-score {
+    border-radius: 15px;
+}
+
+.ball {
+    display: inline-flex;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #eee;
+    align-items: center;
+    justify-content: center;
+    margin: 3px;
+    font-weight: bold;
+}
+
+</style>
+
+<link rel="stylesheet" href="style.css">
+</head>
+
+
+<body>
+
+
+<nav class="navbar navbar-dark px-3">
+
+    <span class="navbar-brand fw-bold">
+        🏏 CRICKET LIVE
+    </span>
+
+</nav>
+
+
+<div class="container py-3">
+
+    <div id="loading"
+         class="text-center py-5">
+
+        Loading match...
+
+    </div>
+
+
+    <div id="app"
+         class="d-none">
+
+
+        <!-- HEADER -->
+
+        <div class="card shadow-sm mb-3">
+
+            <div class="card-body text-center">
+
+                <div class="small text-muted"
+                     id="tournamentName">
+                </div>
+
+                <h4 class="fw-bold">
+
+                    <span id="teamA"></span>
+
+                    <span class="text-muted">
+                        VS
+                    </span>
+
+                    <span id="teamB"></span>
+
+                </h4>
+
+                <div id="matchInfo"
+                     class="small text-muted">
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- LIVE SCORE -->
+
+        <div class="score-card shadow p-4 text-center mb-3">
+
+            <div class="small">
+
+                <span class="live-dot"></span>
+
+                <span id="status">
+                    LIVE
+                </span>
+
+            </div>
+
+
+            <h5 class="mt-3"
+                id="battingTeam">
+            </h5>
+
+
+            <div class="big-score">
+
+                <span id="score">
+                    0
+                </span>
+
+                /
+
+                <span id="wickets">
+                    0
+                </span>
+
+            </div>
+
+
+            <div class="fs-5">
+
+                Overs:
+                <span id="overs">
+                    0.0
+                </span>
+
+            </div>
+
+
+            <div id="target"
+                 class="mt-2">
+            </div>
+
+        </div>
+
+
+        <!-- BOTH TEAM SCORES -->
+
+        <div class="row g-2 mb-3">
+
+            <div class="col-6">
+
+                <div class="card team-score shadow-sm">
+
+                    <div class="card-body text-center">
+
+                        <div id="teamAName">
+                        </div>
+
+                        <h3 id="teamAScore">
+                            0/0
+                        </h3>
+
+                        <small>
+                            <span id="teamAOvers">
+                                0.0
+                            </span>
+                            overs
+                        </small>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="col-6">
+
+                <div class="card team-score shadow-sm">
+
+                    <div class="card-body text-center">
+
+                        <div id="teamBName">
+                        </div>
+
+                        <h3 id="teamBScore">
+                            0/0
+                        </h3>
+
+                        <small>
+                            <span id="teamBOvers">
+                                0.0
+                            </span>
+                            overs
+                        </small>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- RESULT -->
+
+        <div id="resultCard"
+             class="card shadow-sm mb-3 d-none">
+
+            <div class="card-body text-center">
+
+                <h4>
+                    🏆 Match Result
+                </h4>
+
+                <h3 id="winner"
+                    class="fw-bold">
+                </h3>
+
+            </div>
+
+        </div>
+
+
+        <!-- PLAYING XI -->
+
+        <div class="card shadow-sm mb-3">
+
+            <div class="card-body">
+
+                <h5 class="fw-bold">
+                    👥 Playing XI
+                </h5>
+
+                <div class="mb-3">
+
+                    <h6 id="xiAName"></h6>
+
+                    <div id="xiA"></div>
+
+                </div>
+
+                <hr>
+
+                <div>
+
+                    <h6 id="xiBName"></h6>
+
+                    <div id="xiB"></div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- REFRESH -->
+
+        <div class="text-center">
+
+            <small class="text-muted">
+                🔄 Live updates automatically
+            </small>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script type="module">
+
+import { db } from "./firebase-config.js";
+
+import {
+    doc,
+    onSnapshot,
+    collection,
+    getDocs
+}
+from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+
+const params =
+    new URLSearchParams(
+        location.search
+    );
+
+
+const matchId =
+    params.get("matchId");
+
+
+if (!matchId) {
+
+    document.getElementById("loading")
+        .textContent =
+        "Match not found.";
+
+} else {
+
+    loadMatch();
+
+}
+
+
+let players = [];
+
+
+async function loadPlayers() {
+
+    const snapshot =
+        await getDocs(
+            collection(db, "players")
+        );
+
+
+    players = [];
+
+
+    snapshot.forEach(item => {
+
+        players.push({
+
+            id: item.id,
+
+            ...item.data()
+
+        });
+
+    });
+
+}
+
+
+async function loadMatch() {
+
+    await loadPlayers();
+
+
+    const matchRef =
+        doc(
+            db,
+            "matches",
+            matchId
+        );
+
+
+    onSnapshot(
+        matchRef,
+        snapshot => {
+
+            if (!snapshot.exists()) {
+
+                document.getElementById("loading")
+                    .textContent =
+                    "Match not found.";
+
+                return;
+
+            }
+
+
+            const match =
+                snapshot.data();
+
+
+            document.getElementById("loading")
+                .classList.add("d-none");
+
+
+            document.getElementById("app")
+                .classList.remove("d-none");
+
+
+            render(match);
+
+        }
+    );
+
+}
+
+
+function render(match) {
+
+    document.getElementById("tournamentName")
+        .textContent =
+        match.tournamentName || "";
+
+
+    document.getElementById("teamA")
+        .textContent =
+        match.teamAName || "Team A";
+
+
+    document.getElementById("teamB")
+        .textContent =
+        match.teamBName || "Team B";
+
+
+    document.getElementById("matchInfo")
+        .textContent =
+        `${match.date || ""} • ${match.time || ""} • ${match.venue || ""}`;
+
+
+    document.getElementById("status")
+        .textContent =
+        match.status || "UPCOMING";
+
+
+    const battingTeam =
+        match.currentInnings === 1
+        ? match.battingFirstId
+        : (
+            match.battingFirstId === match.teamAId
+            ? match.teamBId
+            : match.teamAId
+        );
+
+
+    const battingName =
+        battingTeam === match.teamAId
+        ? match.teamAName
+        : match.teamBName;
+
+
+    document.getElementById("battingTeam")
+        .textContent =
+        battingName;
+
+
+    let score = 0;
+
+    let wickets = 0;
+
+    let balls = 0;
+
+
+    if (battingTeam === match.teamAId) {
+
+        score =
+            match.teamAScore || 0;
+
+        wickets =
+            match.teamAWickets || 0;
+
+        balls =
+            match.teamABalls || 0;
+
+    } else {
+
+        score =
+            match.teamBScore || 0;
+
+        wickets =
+            match.teamBWickets || 0;
+
+        balls =
+            match.teamBBalls || 0;
+
+    }
+
+
+    document.getElementById("score")
+        .textContent =
+        score;
+
+
+    document.getElementById("wickets")
+        .textContent =
+        wickets;
+
+
+    document.getElementById("overs")
+        .textContent =
+        `${Math.floor(balls / 6)}.${balls % 6}`;
+
+
+    /* TEAM A */
+
+    document.getElementById("teamAName")
+        .textContent =
+        match.teamAName;
+
+
+    document.getElementById("teamAScore")
+        .textContent =
+        `${match.teamAScore || 0}/${match.teamAWickets || 0}`;
+
+
+    document.getElementById("teamAOvers")
+        .textContent =
+        `${Math.floor((match.teamABalls || 0) / 6)}.${(match.teamABalls || 0) % 6}`;
+
+
+    /* TEAM B */
+
+    document.getElementById("teamBName")
+        .textContent =
+        match.teamBName;
+
+
+    document.getElementById("teamBScore")
+        .textContent =
+        `${match.teamBScore || 0}/${match.teamBWickets || 0}`;
+
+
+    document.getElementById("teamBOvers")
+        .textContent =
+        `${Math.floor((match.teamBBalls || 0) / 6)}.${(match.teamBBalls || 0) % 6}`;
+
+
+    /* TARGET */
+
+    if (match.currentInnings === 2) {
+
+        const firstScore =
+            match.battingFirstId === match.teamAId
+            ? match.teamAScore || 0
+            : match.teamBScore || 0;
+
+
+        document.getElementById("target")
+            .textContent =
+            `Target: ${firstScore + 1}`;
+
+    } else {
+
+        document.getElementById("target")
+            .textContent = "";
+
+    }
+
+
+    /* RESULT */
+
+    if (match.status === "COMPLETED") {
+
+        document.getElementById("resultCard")
+            .classList.remove("d-none");
+
+
+        document.getElementById("winner")
+            .textContent =
+            match.winner || "Draw";
+
+    } else {
+
+        document.getElementById("resultCard")
+            .classList.add("d-none");
+
+    }
+
+
+    renderXI(match);
+
+}
+
+
+function renderXI(match) {
+
+    document.getElementById("xiAName")
+        .textContent =
+        match.teamAName;
+
+
+    document.getElementById("xiBName")
+        .textContent =
+        match.teamBName;
+
+
+    const xiA =
+        match.playingXI?.teamA || [];
+
+
+    const xiB =
+        match.playingXI?.teamB || [];
+
+
+    document.getElementById("xiA")
+        .innerHTML =
+        xiA.map(id => {
+
+            const player =
+                players.find(
+                    p => p.id === id
+                );
+
+
+            return `
+
+                <div class="border
+                            rounded
+                            p-2
+                            mb-2">
+
+                    ${player?.name || "Player"}
+
+                    ${
+                        player?.role
+                        ?
+                        `<small class="text-muted">
+                            • ${player.role}
+                        </small>`
+                        :
+                        ""
+                    }
+
+                </div>
+
+            `;
+
+        }).join("");
+
+
+    document.getElementById("xiB")
+        .innerHTML =
+        xiB.map(id => {
+
+            const player =
+                players.find(
+                    p => p.id === id
+                );
+
+
+            return `
+
+                <div class="border
+                            rounded
+                            p-2
+                            mb-2">
+
+                    ${player?.name || "Player"}
+
+                    ${
+                        player?.role
+                        ?
+                        `<small class="text-muted">
+                            • ${player.role}
+                        </small>`
+                        :
+                        ""
+                    }
+
+                </div>
+
+            `;
+
+        }).join("");
+
+}
+
+</script>
+
+<script type="module">import { protectAdminPage } from "./auth.js"; protectAdminPage();</script>
+</body>
+</html>

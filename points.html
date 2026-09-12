@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0">
+
+<title>Points Table</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet">
+
+<style>
+
+body {
+    background: #f1f3f6;
+}
+
+.navbar {
+    background: #111827;
+}
+
+.card {
+    border: 0;
+    border-radius: 16px;
+}
+
+.table {
+    vertical-align: middle;
+}
+
+.team-logo {
+    width: 35px;
+    height: 35px;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+</style>
+
+<link rel="stylesheet" href="style.css">
+</head>
+
+
+<body>
+
+
+<nav class="navbar navbar-dark px-3">
+
+    <span class="navbar-brand fw-bold">
+        🏆 POINTS TABLE
+    </span>
+
+    <a href="index.html"
+       class="btn btn-outline-light btn-sm">
+
+        Home
+
+    </a>
+
+</nav>
+
+
+<div class="container py-3">
+
+
+    <div class="card shadow-sm p-3 mb-3">
+
+        <label class="form-label fw-bold">
+            Select Tournament
+        </label>
+
+        <select id="tournament"
+                class="form-select">
+
+            <option value="">
+                Select Tournament
+            </option>
+
+        </select>
+
+    </div>
+
+
+    <div class="card shadow-sm">
+
+        <div class="card-body">
+
+            <h5 id="title"
+                class="fw-bold mb-3">
+
+                Points Table
+
+            </h5>
+
+
+            <div class="table-responsive">
+
+                <table class="table">
+
+                    <thead class="table-dark">
+
+                        <tr>
+
+                            <th>#</th>
+
+                            <th>Team</th>
+
+                            <th>P</th>
+
+                            <th>W</th>
+
+                            <th>L</th>
+
+                            <th>T</th>
+
+                            <th>Pts</th>
+
+                            <th>NRR</th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody id="tableBody">
+
+                        <tr>
+
+                            <td colspan="8"
+                                class="text-center text-muted">
+
+                                Select tournament
+
+                            </td>
+
+                        </tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script type="module">
+
+import { db } from "./firebase-config.js";
+
+import {
+    collection,
+    getDocs
+}
+from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+
+const tournamentSelect =
+    document.getElementById(
+        "tournament"
+    );
+
+
+let tournaments = [];
+
+let teams = [];
+
+let matches = [];
+
+
+/* LOAD */
+
+async function loadData() {
+
+    const [
+        tournamentSnap,
+        teamSnap,
+        matchSnap
+    ] = await Promise.all([
+
+        getDocs(
+            collection(
+                db,
+                "tournaments"
+            )
+        ),
+
+        getDocs(
+            collection(
+                db,
+                "teams"
+            )
+        ),
+
+        getDocs(
+            collection(
+                db,
+                "matches"
+            )
+        )
+
+    ]);
+
+
+    tournamentSnap.forEach(item => {
+
+        tournaments.push({
+
+            id: item.id,
+
+            ...item.data()
+
+        });
+
+    });
+
+
+    teamSnap.forEach(item => {
+
+        teams.push({
+
+            id: item.id,
+
+            ...item.data()
+
+        });
+
+    });
+
+
+    matchSnap.forEach(item => {
+
+        matches.push({
+
+            id: item.id,
+
+            ...item.data()
+
+        });
+
+    });
+
+
+    renderTournamentSelect();
+
+}
+
+
+function renderTournamentSelect() {
+
+    tournamentSelect.innerHTML = `
+
+        <option value="">
+            Select Tournament
+        </option>
+
+    `;
+
+
+    tournaments.forEach(t => {
+
+        tournamentSelect.innerHTML += `
+
+            <option value="${t.id}">
+                ${t.name}
+            </option>
+
+        `;
+
+    });
+
+}
+
+
+tournamentSelect.addEventListener(
+    "change",
+    renderPoints
+);
+
+
+/* POINTS */
+
+function renderPoints() {
+
+    const tournamentId =
+        tournamentSelect.value;
+
+
+    if (!tournamentId) {
+
+        return;
+
+    }
+
+
+    const tournamentTeams =
+        teams.filter(
+            t =>
+                t.tournamentId ===
+                tournamentId
+        );
+
+
+    const tournamentMatches =
+        matches.filter(
+            m =>
+                m.tournamentId ===
+                tournamentId &&
+                m.status ===
+                "COMPLETED"
+        );
+
+
+    const table = {};
+
+
+    tournamentTeams.forEach(team => {
+
+        table[team.id] = {
+
+            id: team.id,
+
+            name: team.name,
+
+            logoUrl:
+                team.logoUrl || "",
+
+            played: 0,
+
+            wins: 0,
+
+            losses: 0,
+
+            ties: 0,
+
+            points: 0,
+
+            runsFor: 0,
+
+            runsAgainst: 0,
+
+            ballsFor: 0,
+
+            ballsAgainst: 0
+
+        };
+
+    });
+
+
+    tournamentMatches.forEach(match => {
+
+        const a =
+            table[match.teamAId];
+
+        const b =
+            table[match.teamBId];
+
+
+        if (!a || !b)
+            return;
+
+
+        a.played++;
+
+        b.played++;
+
+
+        const scoreA =
+            match.teamAScore || 0;
+
+        const scoreB =
+            match.teamBScore || 0;
+
+
+        a.runsFor += scoreA;
+
+        a.runsAgainst += scoreB;
+
+
+        b.runsFor += scoreB;
+
+        b.runsAgainst += scoreA;
+
+
+        a.ballsFor +=
+            match.teamABalls || 0;
+
+        a.ballsAgainst +=
+            match.teamBBalls || 0;
+
+
+        b.ballsFor +=
+            match.teamBBalls || 0;
+
+        b.ballsAgainst +=
+            match.teamABalls || 0;
+
+
+        if (
+            match.winner ===
+            match.teamAName
+        ) {
+
+            a.wins++;
+
+            a.points += 2;
+
+            b.losses++;
+
+        }
+
+        else if (
+            match.winner ===
+            match.teamBName
+        ) {
+
+            b.wins++;
+
+            b.points += 2;
+
+            a.losses++;
+
+        }
+
+        else {
+
+            a.ties++;
+
+            b.ties++;
+
+            a.points++;
+
+            b.points++;
+
+        }
+
+    });
+
+
+    const rows =
+        Object.values(table);
+
+
+    rows.forEach(team => {
+
+        team.nrr =
+            calculateNRR(team);
+
+    });
+
+
+    rows.sort((a, b) => {
+
+        if (
+            b.points !==
+            a.points
+        ) {
+
+            return b.points -
+                   a.points;
+
+        }
+
+        return b.nrr - a.nrr;
+
+    });
+
+
+    document.getElementById("title")
+        .textContent =
+        tournaments.find(
+            t =>
+                t.id === tournamentId
+        )?.name +
+        " — Points Table";
+
+
+    document.getElementById("tableBody")
+        .innerHTML =
+
+        rows.map((team, index) => `
+
+            <tr>
+
+                <td>
+                    <strong>
+                        ${index + 1}
+                    </strong>
+                </td>
+
+
+                <td>
+
+                    <div class="d-flex
+                                align-items-center
+                                gap-2">
+
+                        ${
+                            team.logoUrl
+                            ?
+                            `<img
+                                src="${team.logoUrl}"
+                                class="team-logo">`
+                            :
+                            "🏏"
+                        }
+
+                        <strong>
+                            ${team.name}
+                        </strong>
+
+                    </div>
+
+                </td>
+
+
+                <td>
+                    ${team.played}
+                </td>
+
+
+                <td>
+                    ${team.wins}
+                </td>
+
+
+                <td>
+                    ${team.losses}
+                </td>
+
+
+                <td>
+                    ${team.ties}
+                </td>
+
+
+                <td>
+                    <strong>
+                        ${team.points}
+                    </strong>
+                </td>
+
+
+                <td>
+                    ${team.nrr.toFixed(3)}
+                </td>
+
+            </tr>
+
+        `).join("");
+
+}
+
+
+function calculateNRR(team) {
+
+    if (
+        team.ballsFor === 0 ||
+        team.ballsAgainst === 0
+    ) {
+
+        return 0;
+
+    }
+
+
+    const runRateFor =
+        team.runsFor /
+        (team.ballsFor / 6);
+
+
+    const runRateAgainst =
+        team.runsAgainst /
+        (team.ballsAgainst / 6);
+
+
+    return (
+        runRateFor -
+        runRateAgainst
+    );
+
+}
+
+
+loadData();
+
+</script>
+
+<div class="container pb-4 text-center"><a href="teams-view.html" class="btn btn-outline-primary px-4">👥 Teams & Players</a></div>
+</body>
+
+</html>

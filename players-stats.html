@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0">
+
+<title>Player Stats</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet">
+
+<style>
+
+body {
+    background: #f1f3f6;
+}
+
+.navbar {
+    background: #111827;
+}
+
+.card {
+    border: 0;
+    border-radius: 16px;
+}
+
+.player-photo {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.table {
+    font-size: 14px;
+}
+
+</style>
+
+<link rel="stylesheet" href="style.css">
+</head>
+
+
+<body>
+
+
+<nav class="navbar navbar-dark px-3">
+
+    <span class="navbar-brand fw-bold">
+        🏏 PLAYER STATS
+    </span>
+
+    <a href="index.html"
+       class="btn btn-outline-light btn-sm">
+
+        Home
+
+    </a>
+
+</nav>
+
+
+<div class="container py-3">
+
+
+    <div class="card shadow-sm p-3 mb-3">
+
+        <label class="form-label fw-bold">
+            Tournament
+        </label>
+
+        <select id="tournament"
+                class="form-select">
+
+            <option value="">
+                Select Tournament
+            </option>
+
+        </select>
+
+    </div>
+
+
+    <div class="card shadow-sm mb-3">
+
+        <div class="card-body">
+
+            <h5 class="fw-bold">
+                🏏 Top Batters
+            </h5>
+
+
+            <div class="table-responsive">
+
+                <table class="table">
+
+                    <thead class="table-dark">
+
+                        <tr>
+
+                            <th>Player</th>
+
+                            <th>Runs</th>
+
+                            <th>Balls</th>
+
+                            <th>4s</th>
+
+                            <th>6s</th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody id="battingBody">
+
+                        <tr>
+
+                            <td colspan="5"
+                                class="text-center text-muted">
+
+                                Select tournament
+
+                            </td>
+
+                        </tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="card shadow-sm">
+
+        <div class="card-body">
+
+            <h5 class="fw-bold">
+                🎯 Top Bowlers
+            </h5>
+
+
+            <div class="table-responsive">
+
+                <table class="table">
+
+                    <thead class="table-dark">
+
+                        <tr>
+
+                            <th>Player</th>
+
+                            <th>Overs</th>
+
+                            <th>Runs</th>
+
+                            <th>Wickets</th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody id="bowlingBody">
+
+                        <tr>
+
+                            <td colspan="4"
+                                class="text-center text-muted">
+
+                                Select tournament
+
+                            </td>
+
+                        </tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script type="module">
+
+import { db } from "./firebase-config.js";
+
+import {
+    collection,
+    getDocs
+}
+from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+
+let tournaments = [];
+
+let matches = [];
+
+let players = [];
+
+
+const tournamentSelect =
+    document.getElementById(
+        "tournament"
+    );
+
+
+/* LOAD */
+
+async function loadData() {
+
+    const [
+        tournamentSnap,
+        matchSnap,
+        playerSnap
+    ] = await Promise.all([
+
+        getDocs(
+            collection(
+                db,
+                "tournaments"
+            )
+        ),
+
+        getDocs(
+            collection(
+                db,
+                "matches"
+            )
+        ),
+
+        getDocs(
+            collection(
+                db,
+                "players"
+            )
+        )
+
+    ]);
+
+
+    tournamentSnap.forEach(item => {
+
+        tournaments.push({
+
+            id: item.id,
+
+            ...item.data()
+
+        });
+
+    });
+
+
+    matchSnap.forEach(item => {
+
+        matches.push({
+
+            id: item.id,
+
+            ...item.data()
+
+        });
+
+    });
+
+
+    playerSnap.forEach(item => {
+
+        players.push({
+
+            id: item.id,
+
+            ...item.data()
+
+        });
+
+    });
+
+
+    tournaments.forEach(t => {
+
+        tournamentSelect.innerHTML += `
+
+            <option value="${t.id}">
+                ${t.name}
+            </option>
+
+        `;
+
+    });
+
+}
+
+
+tournamentSelect.addEventListener(
+    "change",
+    loadStats
+);
+
+
+/* STATS */
+
+async function loadStats() {
+
+    const tournamentId =
+        tournamentSelect.value;
+
+
+    if (!tournamentId)
+        return;
+
+
+    const tournamentMatches =
+        matches.filter(
+            m =>
+                m.tournamentId ===
+                tournamentId &&
+                m.status ===
+                "COMPLETED"
+        );
+
+
+    const batting = {};
+
+    const bowling = {};
+
+
+    for (
+        const match of tournamentMatches
+    ) {
+
+        const ballsSnap =
+            await getDocs(
+
+                collection(
+                    db,
+                    "matches",
+                    match.id,
+                    "balls"
+                )
+
+            );
+
+
+        ballsSnap.forEach(item => {
+
+            const ball =
+                item.data();
+
+
+            /* BATTING */
+
+            if (ball.batterId) {
+
+                if (!batting[ball.batterId]) {
+
+                    batting[ball.batterId] = {
+
+                        id:
+                            ball.batterId,
+
+                        runs: 0,
+
+                        balls: 0,
+
+                        fours: 0,
+
+                        sixes: 0
+
+                    };
+
+                }
+
+
+                const p =
+                    batting[ball.batterId];
+
+
+                if (
+                    !ball.extraType ||
+                    ball.extraType === "noball"
+                ) {
+
+                    p.runs +=
+                        ball.runs || 0;
+
+                }
+
+
+                if (ball.legalBall) {
+
+                    p.balls++;
+
+                }
+
+
+                if (
+                    ball.runs === 4 &&
+                    !ball.extraType
+                ) {
+
+                    p.fours++;
+
+                }
+
+
+                if (
+                    ball.runs === 6 &&
+                    !ball.extraType
+                ) {
+
+                    p.sixes++;
+
+                }
+
+            }
+
+
+            /* BOWLING */
+
+            if (ball.bowlerId) {
+
+                if (!bowling[ball.bowlerId]) {
+
+                    bowling[ball.bowlerId] = {
+
+                        id:
+                            ball.bowlerId,
+
+                        balls: 0,
+
+                        runs: 0,
+
+                        wickets: 0
+
+                    };
+
+                }
+
+
+                const p =
+                    bowling[ball.bowlerId];
+
+
+                if (ball.legalBall) {
+
+                    p.balls++;
+
+                }
+
+
+                if (
+                    ball.extraType === "wide" ||
+                    ball.extraType === "noball"
+                ) {
+
+                    p.runs +=
+                        ball.extra || 0;
+
+                }
+
+
+                if (!ball.extraType) {
+
+                    p.runs +=
+                        ball.runs || 0;
+
+                }
+
+
+                if (ball.wicket) {
+
+                    p.wickets++;
+
+                }
+
+            }
+
+        });
+
+    }
+
+
+    renderBatting(batting);
+
+    renderBowling(bowling);
+
+}
+
+
+/* BATTERS */
+
+function renderBatting(data) {
+
+    const rows =
+        Object.values(data)
+        .sort(
+            (a, b) =>
+                b.runs - a.runs
+        );
+
+
+    document.getElementById(
+        "battingBody"
+    ).innerHTML =
+
+        rows.map(p => {
+
+            const player =
+                players.find(
+                    x =>
+                        x.id === p.id
+                );
+
+
+            return `
+
+                <tr>
+
+                    <td>
+
+                        <strong>
+                            ${player?.name || "Unknown"}
+                        </strong>
+
+                    </td>
+
+                    <td>
+                        ${p.runs}
+                    </td>
+
+                    <td>
+                        ${p.balls}
+                    </td>
+
+                    <td>
+                        ${p.fours}
+                    </td>
+
+                    <td>
+                        ${p.sixes}
+                    </td>
+
+                </tr>
+
+            `;
+
+        }).join("") ||
+
+        `
+
+        <tr>
+
+            <td colspan="5"
+                class="text-center text-muted">
+
+                No statistics yet.
+
+            </td>
+
+        </tr>
+
+        `;
+
+}
+
+
+/* BOWLERS */
+
+function renderBowling(data) {
+
+    const rows =
+        Object.values(data)
+        .sort(
+            (a, b) =>
+                b.wickets - a.wickets
+        );
+
+
+    document.getElementById(
+        "bowlingBody"
+    ).innerHTML =
+
+        rows.map(p => {
+
+            const player =
+                players.find(
+                    x =>
+                        x.id === p.id
+                );
+
+
+            return `
+
+                <tr>
+
+                    <td>
+
+                        <strong>
+                            ${player?.name || "Unknown"}
+                        </strong>
+
+                    </td>
+
+                    <td>
+
+                        ${Math.floor(p.balls / 6)}.${p.balls % 6}
+
+                    </td>
+
+                    <td>
+                        ${p.runs}
+                    </td>
+
+                    <td>
+                        <strong>
+                            ${p.wickets}
+                        </strong>
+                    </td>
+
+                </tr>
+
+            `;
+
+        }).join("") ||
+
+        `
+
+        <tr>
+
+            <td colspan="4"
+                class="text-center text-muted">
+
+                No statistics yet.
+
+            </td>
+
+        </tr>
+
+        `;
+
+}
+
+
+loadData();
+
+</script>
+
+<div class="container pb-4 text-center"><a href="teams-view.html" class="btn btn-outline-primary px-4">👥 Teams & Players</a></div>
+</body>
+
+</html>
