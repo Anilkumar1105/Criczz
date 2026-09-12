@@ -64,6 +64,47 @@ body {
 
 .selected-player {
     border: 3px solid #0d6efd !important;
+    background: #f4f0ff !important;
+}
+.xi-switch {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-bottom:14px;
+}
+.xi-switch button {
+    border:1px solid #d9ddea;
+    border-radius:14px;
+    padding:12px 10px;
+    background:#f8f9fc;
+    font-weight:700;
+}
+.xi-switch button.active {
+    background:#6f2cff;
+    color:#fff;
+    border-color:#6f2cff;
+    box-shadow:0 8px 22px rgba(111,44,255,.22);
+}
+.xi-switch button {
+    min-height:62px;
+    cursor:pointer;
+}
+.xi-switch button:active { transform:scale(.98); }
+.xi-panel { display:none; }
+.xi-panel.active { display:block; }
+.xi-count {
+    font-size:12px;
+    padding:4px 8px;
+    border-radius:999px;
+    background:#eef1f7;
+}
+.xi-empty {
+    border:1px dashed #c8cedb;
+    border-radius:14px;
+    padding:20px;
+    color:#6c757d;
+    text-align:center;
+    background:#fafbfe;
 }
 
 .small-stat {
@@ -187,26 +228,29 @@ body {
                     👥 Playing XI
                 </h5>
 
-                <p class="small text-muted">
-                    Select 11 players for each team.
+                <p class="small text-muted mb-3">
+                    Select exactly <strong>11 players from Team A</strong> and <strong>11 players from Team B</strong>. Tap the team tabs to switch between the two squads.
                 </p>
 
-                <div class="mb-3">
-
-                    <h6 id="xiTeamAName"></h6>
-
-                    <div id="xiTeamA"></div>
-
+                <div class="xi-switch">
+                    <button type="button" id="xiTabA" class="active">
+                        <span id="xiTabAName">Team A</span><br>
+                        <span class="xi-count" id="xiCountA">0/11</span>
+                    </button>
+                    <button type="button" id="xiTabB">
+                        <span id="xiTabBName">Team B</span><br>
+                        <span class="xi-count" id="xiCountB">0/11</span>
+                    </button>
                 </div>
 
-                <hr>
+                <div id="xiPanelA" class="xi-panel active">
+                    <h6 id="xiTeamAName" class="fw-bold mb-2"></h6>
+                    <div id="xiTeamA"></div>
+                </div>
 
-                <div>
-
-                    <h6 id="xiTeamBName"></h6>
-
+                <div id="xiPanelB" class="xi-panel">
+                    <h6 id="xiTeamBName" class="fw-bold mb-2"></h6>
                     <div id="xiTeamB"></div>
-
                 </div>
 
                 <button id="announceXI"
@@ -573,6 +617,9 @@ let selectedXI_A = [];
 
 let selectedXI_B = [];
 
+let xiInitialized = false;
+let activeXITeam = "A";
+
 let tossWinner = "";
 
 let currentInnings = 0;
@@ -874,106 +921,79 @@ document.getElementById("startMatch")
 
 function renderXI() {
 
-    document.getElementById("xiTeamAName")
-        .textContent =
-        match.teamAName;
+    document.getElementById("xiTeamAName").textContent = match.teamAName || "Team A";
+    document.getElementById("xiTeamBName").textContent = match.teamBName || "Team B";
+    document.getElementById("xiTabAName").textContent = match.teamAName || "Team A";
+    document.getElementById("xiTabBName").textContent = match.teamBName || "Team B";
 
+    // Restore any previously saved XI once when the page is opened/reloaded.
+    if (!xiInitialized) {
+        selectedXI_A = Array.isArray(match.playingXI?.teamA) ? [...match.playingXI.teamA] : [];
+        selectedXI_B = Array.isArray(match.playingXI?.teamB) ? [...match.playingXI.teamB] : [];
+        xiInitialized = true;
+    }
 
-    document.getElementById("xiTeamBName")
-        .textContent =
-        match.teamBName;
+    // Resolve players using BOTH teamId and teamName. This prevents an empty XI
+    // when older player records were saved with teamName instead of teamId.
+    const normalize = value => String(value ?? '').trim().toLowerCase();
+    const teamAId = String(match.teamAId ?? '');
+    const teamBId = String(match.teamBId ?? '');
+    const teamAName = normalize(match.teamAName);
+    const teamBName = normalize(match.teamBName);
 
-
-    const teamAPlayers =
-        players.filter(
-            p =>
-                p.teamId === match.teamAId
-        );
-
-
-    const teamBPlayers =
-        players.filter(
-            p =>
-                p.teamId === match.teamBId
-        );
-
-
-    renderPlayerSelection(
-        teamAPlayers,
-        "xiTeamA",
-        selectedXI_A
+    const teamAPlayers = players.filter(p =>
+        String(p.teamId ?? '') === teamAId ||
+        normalize(p.teamName) === teamAName
     );
 
-
-    renderPlayerSelection(
-        teamBPlayers,
-        "xiTeamB",
-        selectedXI_B
+    const teamBPlayers = players.filter(p =>
+        String(p.teamId ?? '') === teamBId ||
+        normalize(p.teamName) === teamBName
     );
 
+    renderPlayerSelection(teamAPlayers, "xiTeamA", selectedXI_A);
+    renderPlayerSelection(teamBPlayers, "xiTeamB", selectedXI_B);
+
+    document.getElementById("xiCountA").textContent = `${selectedXI_A.length}/11`;
+    document.getElementById("xiCountB").textContent = `${selectedXI_B.length}/11`;
+
+    document.getElementById("xiCountA").style.background = selectedXI_A.length === 11 ? "#d1fae5" : "#eef1f7";
+    document.getElementById("xiCountB").style.background = selectedXI_B.length === 11 ? "#d1fae5" : "#eef1f7";
+
+    document.getElementById("xiPanelA").classList.toggle("active", activeXITeam === "A");
+    document.getElementById("xiPanelB").classList.toggle("active", activeXITeam === "B");
+    document.getElementById("xiTabA").classList.toggle("active", activeXITeam === "A");
+    document.getElementById("xiTabB").classList.toggle("active", activeXITeam === "B");
+
+    if (!teamAPlayers.length) {
+        document.getElementById("xiTeamA").innerHTML = `<div class="xi-empty"><div class="fs-4 mb-2">👥</div><strong>No players found for ${escapeHtml(match.teamAName || "Team A")}</strong><br><small>Go to Admin → Players and make sure these players have this team's Team ID or Team Name.</small><div class="mt-3"><a class="btn btn-sm btn-outline-primary" href="players.html">Manage Players</a></div></div>`;
+    }
+    if (!teamBPlayers.length) {
+        document.getElementById("xiTeamB").innerHTML = `<div class="xi-empty"><div class="fs-4 mb-2">👥</div><strong>No players found for ${escapeHtml(match.teamBName || "Team B")}</strong><br><small>Go to Admin → Players and make sure these players have this team's Team ID or Team Name.</small><div class="mt-3"><a class="btn btn-sm btn-outline-primary" href="players.html">Manage Players</a></div></div>`;
+    }
+}
+
+function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>'"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[ch]));
 }
 
 
-function renderPlayerSelection(
-    list,
-    containerId,
-    selected
-) {
-
-    const container =
-        document.getElementById(containerId);
-
-
-    container.innerHTML =
-        list.map(player => {
-
-            const checked =
-                selected.includes(player.id);
-
-
-            return `
-
-            <div class="border rounded p-2 mb-2
-                        player-row
-                        ${checked ? "selected-player" : ""}"
-                 onclick="togglePlayer(
-                    '${player.id}',
-                    '${containerId}'
-                 )">
-
-                <div class="d-flex
-                            justify-content-between">
-
-                    <span>
-                        ${player.name}
-                    </span>
-
-                    <span>
-                        ${checked ? "✅" : "⬜"}
-                    </span>
-
-                </div>
-
-                <div class="small-stat">
-
-                    ${player.role || ""}
-
-                    ${
-                        player.jerseyNumber
-                        ?
-                        " • #" + player.jerseyNumber
-                        :
-                        ""
-                    }
-
-                </div>
-
+function renderPlayerSelection(list, containerId, selected) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = list.map(player => {
+        const checked = selected.includes(player.id);
+        return `
+        <div class="border rounded p-2 mb-2 player-row ${checked ? "selected-player" : ""}"
+             onclick="togglePlayer('${player.id}', '${containerId}')">
+            <div class="d-flex justify-content-between align-items-center">
+                <span>${escapeHtml(player.name || "Player")}</span>
+                <span>${checked ? "✅" : "⬜"}</span>
             </div>
-
-            `;
-
-        }).join("");
-
+            <div class="small-stat">
+                ${escapeHtml(player.role || "")}${player.jerseyNumber ? " • #" + escapeHtml(player.jerseyNumber) : ""}
+            </div>
+        </div>`;
+    }).join("");
 }
 
 
@@ -1016,30 +1036,45 @@ function(id, containerId) {
 };
 
 
+document.getElementById("xiTabA").addEventListener("click", () => {
+    activeXITeam = "A";
+    renderXI();
+});
+
+document.getElementById("xiTabB").addEventListener("click", () => {
+    activeXITeam = "B";
+    renderXI();
+});
+
+// Make the two XI teams impossible to miss on mobile.
+function openXITeam(team) {
+    activeXITeam = team;
+    renderXI();
+    document.getElementById(team === "A" ? "xiTabA" : "xiTabB")?.scrollIntoView({
+        behavior: "smooth", block: "nearest", inline: "nearest"
+    });
+}
+
+document.getElementById("xiTabA").addEventListener("dblclick", () => openXITeam("A"));
+document.getElementById("xiTabB").addEventListener("dblclick", () => openXITeam("B"));
+
 /* ANNOUNCE XI */
 
 document.getElementById("announceXI")
 .addEventListener("click", async () => {
 
     if (selectedXI_A.length !== 11) {
-
-        alert(
-            "Select exactly 11 players for Team A."
-        );
-
+        activeXITeam = "A";
+        renderXI();
+        alert(`Select exactly 11 players for ${match.teamAName || "Team A"}. Current: ${selectedXI_A.length}/11`);
         return;
-
     }
 
-
     if (selectedXI_B.length !== 11) {
-
-        alert(
-            "Select exactly 11 players for Team B."
-        );
-
+        activeXITeam = "B";
+        renderXI();
+        alert(`Select exactly 11 players for ${match.teamBName || "Team B"}. Current: ${selectedXI_B.length}/11`);
         return;
-
     }
 
 
