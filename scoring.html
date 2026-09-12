@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Live Scoring • CricketScoreApp</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Ctext y=%2750%27 font-size=%2750%27%3E🏏%3C/text%3E%3C/svg%3E">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <style>
@@ -64,8 +65,77 @@ function updateButtons(){const ready=!!(striker&&nonStriker&&bowler)&&!processin
 function openBatterPicker(slot){currentTab=slot;$('batterModalTitle').textContent=slot==='striker'?'Select Striker':'Select Non-Striker';const used=slot==='striker'?nonStriker?.id:striker?.id;const list=battingXI().map(player).filter(Boolean).filter(p=>!dismissed.has(p.id)&&p.id!==used);$('batterChoices').innerHTML=list.map(p=>`<button class="player-choice" data-id="${escapeAttr(p.id)}"><div class="batter-row">${avatar(p)}<div><b>${escapeHtml(names(p))}</b><div class="status">${escapeHtml(p.role||'Player')}${p.jerseyNumber?' • #'+escapeHtml(p.jerseyNumber):''}</div></div></div></button>`).join('')||'<div class="empty">No eligible batters available.</div>';document.querySelectorAll('#batterChoices .player-choice').forEach(x=>x.onclick=()=>{const p=player(x.dataset.id);if(slot==='striker')striker=p;else nonStriker=p;persistPlayers();bootstrap.Modal.getOrCreateInstance($('batterModal')).hide();render();});bootstrap.Modal.getOrCreateInstance($('batterModal')).show()}
 function openWicket(){if(!striker||!nonStriker||!bowler){toast('Select striker, non-striker and bowler first');return}pendingOut=striker;const active=[striker,nonStriker].filter(Boolean);$('outChoices').innerHTML=active.map(p=>`<button class="player-choice ${p.id===pendingOut.id?'border-danger':''}" data-id="${escapeAttr(p.id)}"><b>${escapeHtml(names(p))}</b><div class="status">${p.id===striker.id?'On Strike':'Non-Striker'}</div></button>`).join('');const available=battingXI().map(player).filter(Boolean).filter(p=>!dismissed.has(p.id)&&!active.some(a=>a.id===p.id));fillSelect($('newBatterSelect'),available,'','Select new batter');$('newBatterSelect').value='';document.querySelectorAll('#outChoices .player-choice').forEach(x=>x.onclick=()=>{pendingOut=player(x.dataset.id);document.querySelectorAll('#outChoices .player-choice').forEach(y=>y.classList.remove('border-danger'));x.classList.add('border-danger')});bootstrap.Modal.getOrCreateInstance($('wicketModal')).show()}
 async function persistPlayers(){await updateDoc(doc(db,'matches',matchId),{strikerId:striker?.id||null,nonStrikerId:nonStriker?.id||null,bowlerId:bowler?.id||null,dismissedBatterIds:[...dismissed],updatedAt:serverTimestamp()})}
-async function processBall({runs=0,extra=0,extraType=null,legalBall=true,wicket=false,wicketOutId=null,newBatterId=null}){if(processing)return; if(!striker||!nonStriker||!bowler){toast('Select both batters and a bowler');return}processing=true;updateButtons();try{const d=scoreData();const total=runs+extra;const ns=d.score+total;const nw=d.wickets+(wicket?1:0);const nb=d.balls+(legalBall?1:0);const batting=battingId();const before={strikerId:striker.id,nonStrikerId:nonStriker.id,bowlerId:bowler.id,dismissedBatterIds:[...dismissed]};let nextStriker=striker,nextNon=nonStriker; if(legalBall&&runs%2===1){[nextStriker,nextNon]=[nextNon,nextStriker]} if(wicket){dismissed.add(wicketOutId);if(wicketOutId===striker.id){nextStriker=null}else if(wicketOutId===nonStriker.id){nextNon=null} if(newBatterId){const np=player(newBatterId);if(wicketOutId===striker.id)nextStriker=np;else nextNon=np}else{throw new Error('Select a new batter')} } if(legalBall&&nb%6===0&&!wicket){[nextStriker,nextNon]=[nextNon,nextStriker];bowler=null} if(wicket&&legalBall&&nb%6===0){/* new batter enters before over-end strike swap */[nextStriker,nextNon]=[nextNon,nextStriker];bowler=null}
-const after={strikerId:nextStriker?.id||null,nonStrikerId:nextNon?.id||null,bowlerId:bowler?.id||null,dismissedBatterIds:[...dismissed]};const batterRuns=extraType==='bye'||extraType==='legbye'?0:runs;const bowlerRuns=extraType==='bye'||extraType==='legbye'?0:runs+((extraType==='wide'||extraType==='noball')?extra:0);const ballRef=doc(collection(db,'matches',matchId,'balls'));const batch=writeBatch(db);const upd={updatedAt:serverTimestamp(),strikerId:after.strikerId,nonStrikerId:after.nonStrikerId,bowlerId:after.bowlerId,dismissedBatterIds:after.dismissedBatterIds};if(batting===match.teamAId){upd.teamAScore=ns;upd.teamAWickets=nw;upd.teamABalls=nb}else{upd.teamBScore=ns;upd.teamBWickets=nw;upd.teamBBalls=nb}if((match.currentInnings===2)&&((batting===match.teamAId?ns:ns)>=((match.battingFirstId===match.teamAId?(match.teamAScore||0):(match.teamBScore||0))+1))){upd.status='COMPLETED';upd.winnerId=batting;upd.winner=batting===match.teamAId?match.teamAName:match.teamBName}if(nw>=10||nb>=(Number(match.overs)||10)*6){if(match.currentInnings===1){/* leave innings ending to button unless target reached */}else if(!upd.status){upd.status='COMPLETED';const other=batting===match.teamAId?match.teamBId:match.teamAId;upd.winnerId=other;upd.winner=other===match.teamAId?match.teamAName:match.teamBName}}batch.update(doc(db,'matches',matchId),upd);batch.set(ballRef,{innings:match.currentInnings,battingTeamId:batting,runs:batterRuns,teamRuns:total,extra,extraType,legalBall,wicket,batterId:striker.id,bowlerId:bowler.id,wicketOutId:wicketOutId||null,newBatterId:newBatterId||null,bowlerRuns,clientTime:Date.now(),stateBefore:before,stateAfter:after,createdAt:serverTimestamp()});await batch.commit();striker=nextStriker;nonStriker=nextNon; if(!bowler)toast('Over complete — select a new bowler'); else toast(wicket?'Wicket recorded':'Score recorded');await loadBalls();render();}catch(e){console.error(e);toast(e.message||'Could not save ball');}finally{processing=false;updateButtons()}}
+async function processBall({runs=0,extra=0,extraType=null,legalBall=true,wicket=false,wicketOutId=null,newBatterId=null}){
+  if(processing)return;
+  if(!striker||!nonStriker||!bowler){toast('Select striker, non-striker and bowler');return}
+  if(striker.id===nonStriker.id){toast('Striker and non-striker must be different');return}
+  if(wicket && (!wicketOutId || !newBatterId)){toast('Select OUT player and new batter');return}
+  processing=true; updateButtons();
+  const strikerBefore=striker, nonStrikerBefore=nonStriker, bowlerBefore=bowler;
+  const strikerIdBefore=strikerBefore.id, nonStrikerIdBefore=nonStrikerBefore.id, bowlerIdBefore=bowlerBefore.id;
+  try{
+    const d=scoreData();
+    const total=runs+extra;
+    const ns=d.score+total;
+    const nw=d.wickets+(wicket?1:0);
+    const nb=d.balls+(legalBall?1:0);
+    const batting=battingId();
+    const before={strikerId:strikerIdBefore,nonStrikerId:nonStrikerIdBefore,bowlerId:bowlerIdBefore,dismissedBatterIds:[...dismissed]};
+    let nextStriker=strikerBefore,nextNon=nonStrikerBefore,nextBowler=bowlerBefore;
+
+    // Odd completed runs change the strike.
+    if(legalBall && runs%2===1){[nextStriker,nextNon]=[nextNon,nextStriker]}
+
+    // Wicket: remove the dismissed batter and insert the selected new batter in the same position.
+    if(wicket){
+      if(wicketOutId!==strikerBefore.id && wicketOutId!==nonStrikerBefore.id) throw new Error('Invalid OUT player');
+      const np=player(newBatterId);
+      if(!np) throw new Error('Selected new batter was not found');
+      if(dismissed.has(np.id) || np.id===strikerBefore.id || np.id===nonStrikerBefore.id) throw new Error('New batter is not eligible');
+      dismissed.add(wicketOutId);
+      if(wicketOutId===strikerBefore.id) nextStriker=np; else nextNon=np;
+    }
+
+    // End of over: swap ends, then require a new bowler. Do this AFTER wicket replacement.
+    const overComplete=legalBall && nb>0 && nb%6===0;
+    if(overComplete){[nextStriker,nextNon]=[nextNon,nextStriker]; nextBowler=null;}
+
+    const after={strikerId:nextStriker?.id||null,nonStrikerId:nextNon?.id||null,bowlerId:nextBowler?.id||null,dismissedBatterIds:[...dismissed]};
+    const batterRuns=(extraType==='bye'||extraType==='legbye')?0:runs;
+    const bowlerRuns=(extraType==='bye'||extraType==='legbye')?0:runs+((extraType==='wide'||extraType==='noball')?extra:0);
+    const ballRef=doc(collection(db,'matches',matchId,'balls'));
+    const batch=writeBatch(db);
+    const upd={updatedAt:serverTimestamp(),strikerId:after.strikerId,nonStrikerId:after.nonStrikerId,bowlerId:after.bowlerId,dismissedBatterIds:after.dismissedBatterIds};
+    if(batting===match.teamAId){upd.teamAScore=ns;upd.teamAWickets=nw;upd.teamABalls=nb}else{upd.teamBScore=ns;upd.teamBWickets=nw;upd.teamBBalls=nb}
+
+    // Chase/result handling.
+    if(match.currentInnings===2){
+      const firstScore=match.battingFirstId===match.teamAId?(match.teamAScore||0):(match.teamBScore||0);
+      if(ns>=firstScore+1){
+        upd.status='COMPLETED';upd.winnerId=batting;upd.winner=batting===match.teamAId?match.teamAName:match.teamBName;
+      }else if(nw>=10 || nb>=(Number(match.overs)||10)*6){
+        const other=batting===match.teamAId?match.teamBId:match.teamAId;
+        const otherScore=other===match.teamAId?(match.teamAScore||0):(match.teamBScore||0);
+        if(ns===firstScore){upd.status='COMPLETED';upd.winnerId=null;upd.winner='DRAW';}
+        else {upd.status='COMPLETED';upd.winnerId=other;upd.winner=other===match.teamAId?match.teamAName:match.teamBName;}
+      }
+    }
+
+    batch.update(doc(db,'matches',matchId),upd);
+    batch.set(ballRef,{innings:match.currentInnings,battingTeamId:batting,runs:batterRuns,teamRuns:total,extra,extraType,legalBall,wicket,batterId:strikerIdBefore,bowlerId:bowlerIdBefore,wicketOutId:wicketOutId||null,newBatterId:newBatterId||null,bowlerRuns,clientTime:Date.now(),stateBefore:before,stateAfter:after,createdAt:serverTimestamp()});
+    await batch.commit();
+
+    striker=nextStriker; nonStriker=nextNon; bowler=nextBowler;
+    if(match.status==='COMPLETED' || upd.status==='COMPLETED'){toast(`Match completed: ${upd.winner||'DRAW'}`)}
+    else if(overComplete)toast('Over complete — select the next bowler');
+    else if(wicket)toast('Wicket recorded — new batter is in');
+    else toast('Ball recorded');
+    await loadBalls(); render();
+  }catch(e){
+    console.error('processBall failed:',e);
+    toast(e?.message||'Could not save ball. Please try again.');
+  }finally{processing=false;updateButtons();}
+}
 window.addRuns=r=>processBall({runs:r});
 window.addExtra=type=>processBall({extra:1,extraType:type,legalBall:type==='bye'||type==='legbye'});
 $('changeBatters').onclick=()=>openBatterPicker('striker');$('wicketButton').onclick=openWicket;$('bowlerSelect').onchange=e=>{bowler=player(e.target.value);persistPlayers();updateButtons();renderBowler()};
